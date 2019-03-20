@@ -12,8 +12,7 @@ class Augmentation:
             return tf.image.flip_up_down(img)
         raise ValueError('direction for flip can be horizontal or vertical')
 
-    def color_jitter(self, img, flag=cv2.cv.CV_BGR2RGB):
-        img = cv2.cvtColor(img, flag)
-        return img
-        
+    def color_jitter(self, img, flag=cv2.COLOR_BGR2RGB):
+        return cv2.cvtColor(img, flag)
+
     # TODO: add more image transformations
