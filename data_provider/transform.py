@@ -1,5 +1,5 @@
 import cv2
-import tensorflow as tf
+import numpy as np
 
 class Augmentation:
     def crop(self, img, left, lower, h, w):
@@ -15,4 +15,14 @@ class Augmentation:
     def color_jitter(self, img, flag=cv2.COLOR_BGR2RGB):
         return cv2.cvtColor(img, flag)
 
-    # TODO: add more image transformations
+    def mixup(self, img1, img2, y1, y2, alpha=1):
+        coeff = np.random.beta(alpha, alpha)
+        img = coeff * img1 + (1 - coeff) * img2
+        y = coeff * y1 + (1 - coeff) * y2
+        return (img, y)
+    
+    def vertical_concat(self, img1, img2):
+        pass
+    
+    def horizontal_concat(self, img1, img2):
+        pass
