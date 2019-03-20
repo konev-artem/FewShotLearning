@@ -20,9 +20,15 @@ class Augmentation:
         img = coeff * img1 + (1 - coeff) * img2
         y = coeff * y1 + (1 - coeff) * y2
         return (img, y)
-    
-    def vertical_concat(self, img1, img2):
+
+    def between_class(self, img1, img2, y1, y2, coeff=1):
         pass
     
-    def horizontal_concat(self, img1, img2):
+    def vertical_concat(self, img1, img2, y1, y2, coeff=1):
+        pass
+    
+    def horizontal_concat(self, img1, img2, coeff=1):
+        pass
+    
+    def mixed_concat(self, img1, img2, coeff=1):
         pass
