@@ -20,15 +20,33 @@ class Augmentation:
         img = coeff * img1 + (1 - coeff) * img2
         y = coeff * y1 + (1 - coeff) * y2
         return (img, y)
+    
+    def noisy_mixup(self, img1, img2, y1, y2, alpha=1, scale=0.025):
+        coeff = np.random.beta(alpha, alpha)
+        y = coeff * y1 + (1 - coeff) * y2
+        coeff += np.random.normal(scale=scale, size=(150, 150))
+        constrain = lambda x : max(min(x, 1), 0)
+        coeff = np.vectorize(constrain)(coeff)
+        coeff = coeff[:, :, None]
+        img = coeff * img1 + (1 - coeff) * img2
+        return (img, y)
 
     def between_class(self, img1, img2, y1, y2, coeff=1):
         pass
     
-    def vertical_concat(self, img1, img2, y1, y2, coeff=1):
-        pass
+    def vertical_concat(self, img1, img2, y1, y2, alpha=1):
+        coeff = np.random.beta(alpha, alpha)
+        y = coeff * y1 + (1 - coeff) * y2
+        upper = img1[:int(coeff * img1.shape[0])]
+        lower = img2[int(coeff * img2.shape[0]):]
+        return (np.concatenate((upper, lower)), y)
     
-    def horizontal_concat(self, img1, img2, coeff=1):
-        pass
+    def horizontal_concat(self, img1, img2, y1, y2, alpha=1):
+        coeff = np.random.beta(alpha, alpha)
+        y = coeff * y1 + (1 - coeff) * y2
+        left = img1[:, :int(coeff * img1.shape[1])]
+        right = img2[:, int(coeff * img2.shape[1]):]
+        return (np.concatenate((left, right), axis=1), y)
     
-    def mixed_concat(self, img1, img2, coeff=1):
+    def mixed_concat(self, img1, img2, y1, y2, coeff=1):
         pass
