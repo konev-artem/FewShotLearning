@@ -3,11 +3,9 @@ import tensorflow as tf
 class CosineLayer():
     def __init__(self, num_classes):
         self.num_classes = num_classes
-        self.W = tf.Variable(tf.zeros(input.get_shape()[1], self.num_classes))
+        self.W = tf.Variable(self._W_init_value())
 
     def __call__(self, input):
-        # change initialisation
-
         dot_product = tf.matmul(input, self.W, transpose_b=True)
         f_norm = tf.pow(tf.reduce_sum(tf.multiply(input, input), axis=1, keepdims=True), 0.5)
         w_norm = tf.pow(tf.reduce_sum(tf.multiply(self.W, self.W), axis=0, keepdims=True), 0.5)
@@ -15,7 +13,11 @@ class CosineLayer():
         return dot_product / f_norm / w_norm
 
     def reset(self):
-        self.W.assign(tf.zeros(input.get_shape()[1], self.num_classes))
+        self.W.assign(self._W_init_value())
+
+    def _W_init_value(self):
+        # change it
+        return tf.zeros(input.get_shape()[1], self.num_classes)
 
 
 class FewShotModel():
