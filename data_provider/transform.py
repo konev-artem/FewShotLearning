@@ -2,6 +2,16 @@ import cv2
 import numpy as np
 
 class Augmentation:
+    def get_random_transform(self, img):
+        pass
+
+    def apply_transform(self, img, transform='flip'):
+        return {
+            'flip': self.flip,
+            'color_jitter': self.color_jitter,
+            'crop': self.crop
+        }[transform](self, img)
+
     def crop(self, img, left, lower, h, w):
         return img[lower:lower+h, left:left+w]
 
