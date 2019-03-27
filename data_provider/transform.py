@@ -10,7 +10,7 @@ class Augmentation:
             'flip': self.flip,
             'color_jitter': self.color_jitter,
             'crop': self.crop
-        }[transform](self, img)
+        }[transform](img)
 
     def crop(self, img, left, lower, h, w):
         return img[lower:lower+h, left:left+w]
