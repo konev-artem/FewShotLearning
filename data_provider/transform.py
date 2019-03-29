@@ -37,13 +37,17 @@ def random_flip(img):
     direction = np.random.choice(2)
     return cv2.flip(img, direction)
     
-def color_jitter(img, flag=cv2.COLOR_BGR2RGB):
-    return cv2.cvtColor(img, flag)
+def color_jitter(img, degree=0):
+    hsv = cv2.cvtColor(img1, cv2.COLOR_BGR2HSV)
+    hsv = hsv.astype(dtype=np.uint32)
+    hsv[:, :, 0] += degree 
+    hsv[:, :, 0] %= 180
+    hsv = hsv.astype(dtype=np.uint8)
+    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
 def random_color_jitter(img):
-    flags = [i for i in dir(cv2) if i.startswith('COLOR_')]
-    flag = np.random.choice(flags)
-    return color_jitter(img, getattr(cv2, flag))
+    degree = np.random.choice(180)
+    return color_jitter(img, degree)
 
 def mixup(img1, img2, y1, y2, alpha=1):
     coeff = np.random.beta(alpha, alpha)
