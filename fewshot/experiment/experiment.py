@@ -15,6 +15,16 @@ class Experiment(ABC):
     def run(self):
         """Main method of experiment.
         Do all stuff (train, test) calc metrics,
-        create reports.
+        create and return report.
         """
         ...
+
+
+class Report:
+    """Class to represent experiment results"""
+
+    def __init__(self, metric):
+        self.metric = metric
+
+    def __repr__(self):
+        return "Metric: {:.3f}".format(self.metric)

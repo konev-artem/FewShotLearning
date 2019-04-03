@@ -1,4 +1,4 @@
-from .experiment import Experiment
+from .experiment import Experiment, Report
 from ..datasets import OmniglotPreparer
 
 
@@ -9,4 +9,5 @@ class SimpleExperiment(Experiment):
         ...
 
     def run(self):
-        ...
+        report = Report(metric = 0.5)
+        return report
