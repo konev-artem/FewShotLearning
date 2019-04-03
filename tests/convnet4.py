@@ -60,8 +60,6 @@ class TestConvnet(unittest.TestCase):
         actual = conv.compute_output_shape((2, 256, 256, 3))
         self.assertTrue((2, 256, 256, 3), actual)
 
-
-
     def get_conv_weights(self, convs):
         r = []
         for conv in convs:
