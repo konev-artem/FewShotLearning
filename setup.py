@@ -9,7 +9,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 # requirements.txt
 with open(path.join(here, 'requirements.txt')) as f:
-        requirements = f.read().splitlines()
+    requirements = f.read().splitlines()
 
 setup(
     name='fewshot',

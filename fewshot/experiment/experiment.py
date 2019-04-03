@@ -8,10 +8,6 @@ class Experiment(ABC):
     """
 
     @abstractmethod
-    def setup(self, config):
-        ...
-
-    @abstractmethod
     def run(self):
         """Main method of experiment.
         Do all stuff (train, test) calc metrics,

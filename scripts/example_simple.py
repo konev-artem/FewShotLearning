@@ -4,13 +4,19 @@ import argparse
 
 
 # ... parse arguments ...
-config = {}
+config = {
+    "dataset": {
+        "datase_dir": "./data/omniglot",
+    },
+    "backbone": {},
+    "trainer": {},
+    "tester": {},
+    "metrics": {}
+}
+
 
 # ... create experiment ...
-experiment = SimpleExperiment()
-
-# ... setup experiment ...
-experiment.setup(config)
+experiment = SimpleExperiment(config)
 
 # ... run experiment ...
 report = experiment.run()
