@@ -1,11 +1,11 @@
 import unittest
 
-from fewshot.experiment import BasicExperiment
+from fewshot.experiment import SimpleExperiment
 
 
 class TestExperiment(unittest.TestCase):
 
-    def test_experiment(self):
+    def test_simple_experiment(self):
         # just for example
-        experiment = BasicExperiment()
+        experiment = SimpleExperiment()
         self.assertTrue(True)

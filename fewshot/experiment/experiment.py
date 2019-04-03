@@ -8,23 +8,13 @@ class Experiment(ABC):
     """
 
     @abstractmethod
+    def setup(self, config):
+        ...
+
+    @abstractmethod
     def run(self):
         """Main method of experiment.
         Do all stuff (train, test) calc metrics,
         create reports.
         """
-        ...
-
-
-class BasicExperiment(Experiment):
-    """Basic experiment with metric learning approach"""
-
-    def run(self):
-        ...
-
-
-class MetaLearningExperiment(Experiment):
-    """Meta learning experiment"""
-
-    def run(self):
         ...

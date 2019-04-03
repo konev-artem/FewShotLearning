@@ -1,11 +1,11 @@
-from fewshot.experiment import BasicExperiment
+from fewshot.experiment import SimpleExperiment
 
 import argparse
 
 # ... parse arguments ...
 
 # ... prepare experiment ...
-experiment = BasicExperiment()
+experiment = SimpleExperiment()
 
 # ... run experiment ...
 experiment.run()

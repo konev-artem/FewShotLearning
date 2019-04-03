@@ -1,3 +1,3 @@
-from .experiment import BasicExperiment, MetaLearningExperiment
+from .simple_experiment import SimpleExperiment
 
-__all__ = ["BasicExperiment", "MetaLearningExperiment"]
+__all__ = ["SimpleExperiment"]
