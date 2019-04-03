@@ -3,11 +3,11 @@ import numpy as np
 import random
 
 
-def apply_random_classic_transform(img, p=0.5):
+def apply_random_classic_transform(img, p=[0.5, 0.5, 0.5]):
     transforms = [flip, random_crop, random_color_jitter]
-    for f in transforms:
-        if random.random() < p:
-            img = f(img)
+    for index, transform in transforms:
+        if random.random() < p[index]:
+            img = transform(img)
     return img
 
 
@@ -26,6 +26,7 @@ def crop(img, left, lower, h, w):
 
 
 def random_crop(img, crop_width=None, center=False):
+    # TODO: add constrains on crop size, write code for non-square images
     if crop_width is None:
         crop_width = np.random.randint(1, img.shape[1])
     if center:
@@ -40,12 +41,13 @@ def flip(img):
 
 
 def color_jitter(img, degree=0):
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    # TODO: add saturation and value changes
+    hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
     hsv = hsv.astype(dtype=np.uint32)
     hsv[:, :, 0] += degree
     hsv[:, :, 0] %= 180
     hsv = hsv.astype(dtype=np.uint8)
-    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
 
 def random_color_jitter(img):
@@ -54,6 +56,8 @@ def random_color_jitter(img):
 
 
 def mixup(input1, input2, y1, y2, alpha=1):
+    """ Implemented mixup from mixup: Beyond Empirical Risk Minimization
+        by H. Zhang et al"""
     coeff = np.random.beta(alpha, alpha)
     output = coeff * input1 + (1 - coeff) * input2
     y = coeff * y1 + (1 - coeff) * y2
@@ -75,6 +79,8 @@ def noisy_mixup(img1, img2, y1, y2, alpha=1, scale=0.025):
 
 
 def between_class(img1, img2, y1, y2, coeff=np.random.uniform(0, 1)):
+    """ Implemented between_class+ from Learning from Between-class Examples
+        for Deep Sound Recognition by Tokozume et al"""
     y = coeff * y1 + (1 - coeff) * y2
     sigma1 = img1.std()
     sigma2 = img2.std()
@@ -85,6 +91,8 @@ def between_class(img1, img2, y1, y2, coeff=np.random.uniform(0, 1)):
 
 
 def vertical_concat(img1, img2, y1, y2, alpha=1):
+    """ Implemented vertical concat from Improved Mixed-Example Data Augmentation
+    by Cecilia Summers and Michael J. Dinneen"""
     coeff = np.random.beta(alpha, alpha)
     y = coeff * y1 + (1 - coeff) * y2
     upper = img1[:int(coeff * img1.shape[0])]
@@ -93,6 +101,8 @@ def vertical_concat(img1, img2, y1, y2, alpha=1):
 
 
 def horizontal_concat(img1, img2, y1, y2, alpha=1):
+    """ Implemented horizontal concat from Improved Mixed-Example Data Augmentation
+    by Cecilia Summers and Michael J. Dinneen"""
     coeff = np.random.beta(alpha, alpha)
     y = coeff * y1 + (1 - coeff) * y2
     left = img1[:, :int(coeff * img1.shape[1])]
@@ -101,10 +111,11 @@ def horizontal_concat(img1, img2, y1, y2, alpha=1):
 
 
 def mixed_concat(img1, img2, y1, y2, order=None, alpha=1):
+    """ Implemented mixed concat from Improved Mixed-Example Data Augmentation
+    by Cecilia Summers and Michael J. Dinneen"""
     if order is None:
-        order=[img1, img2, img2, img1]
+        order = [img1, img2, img2, img1]
     coeff1, coeff2 = np.random.beta(alpha, alpha, 2)
-    assert(img1.shape == img2.shape)
     height, width, channels = img1.shape
     y = (coeff1 * coeff2 + (1 - coeff1) * (1 - coeff2)) * y1 \
         + (coeff1 * (1 - coeff2) + (1 - coeff1) * coeff2) * y2
