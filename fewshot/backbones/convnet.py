@@ -1,5 +1,6 @@
 from tensorflow.keras import layers, models, activations, backend
 
+
 # ConvNet-N from "A Closer Look at Few-Shot Classification" Wei-Yu Chen.
 # reference implementation: https://github.com/wyharveychen/CloserLookFewShot/blob/master/backbone.py
 class ConvBlock(layers.Layer):
@@ -39,20 +40,30 @@ class ConvBlock(layers.Layer):
 
 
 class ConvNet:
-    def __init__(self, depth=4):
+    def __init__(self, input_size, depth=4):
         self.blocks = []
         for i in range(depth):
             outdim = 64
             self.blocks.append(ConvBlock(outdim, i < 4))
-                    
-    def build_net(self, input_size):
+        self.inputs, self.outputs = self._build_net(input_size)
+
+    def build_model(self):
+        return models.Model(self.inputs, self.outputs)
+
+    def get_inputs(self):
+        return self.inputs
+
+    def get_outputs(self):
+        return self.outputs
+
+    def _build_net(self, input_size):
         input = layers.Input(shape=input_size)
         x = input
         for block in self.blocks:
             x = block(x)
             
         return [input], [x]
-    
+
     def set_trainable(self, trainable):
         for block in self.blocks:
             block.set_trainable(trainable)

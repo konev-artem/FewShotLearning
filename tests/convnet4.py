@@ -4,21 +4,21 @@ import numpy as np
 from tensorflow.keras import models
 from tensorflow.keras import backend as K
 
-from basenets.convnet import ConvNet, ConvBlock
+from fewshot.backbones.convnet import ConvNet, ConvBlock
 
 
 class TestConvnet(unittest.TestCase):
 
     def test_forward(self):
-        net = ConvNet()
-        model = models.Model(*net.build_net((256, 256, 3)))
+        net = ConvNet((256, 256, 3))
+        model = net.build_model()
 
         input = np.random.random((2, 256, 256, 3)).astype(np.float32)
         self.assertEqual((2, 16, 16, 64), model(input).shape)
 
     def test_fit(self):
-        net = ConvNet()
-        model = models.Model(*net.build_net((256, 256, 3)))
+        net = ConvNet((256, 256, 3))
+        model = net.build_model()
         model.compile(loss='mean_squared_error', optimizer='sgd')
 
         input = np.random.random((2, 256, 256, 3)).astype(np.float32)
@@ -34,8 +34,9 @@ class TestConvnet(unittest.TestCase):
             self.assertFalse(np.allclose(source, target))
 
     def test_freeze(self):
-        net = ConvNet()
-        model = models.Model(*net.build_net((256, 256, 3)))
+        net = ConvNet((256, 256, 3))
+        model = net.build_model()
+        model.compile(loss='mean_squared_error', optimizer='sgd')
         net.set_trainable(False)
         model.compile(loss='mean_squared_error', optimizer='sgd')
 

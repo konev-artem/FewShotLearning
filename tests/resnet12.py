@@ -4,21 +4,21 @@ import numpy as np
 from tensorflow.keras import models
 from tensorflow.keras import backend as K
 
-from basenets.resnet12 import Resnet12, ResidualBlock
+from fewshot.backbones.resnet12 import Resnet12, ResidualBlock
 
 
 class TestResnet12(unittest.TestCase):
 
     def test_forward(self):
-        net = Resnet12()
-        model = models.Model(*net.build_net((256, 256, 3)))
+        net = Resnet12((256, 256, 3), 'relu')
+        model = net.build_model()
 
         input = np.random.random((2, 256, 256, 3)).astype(np.float32)
         self.assertEqual((2, 16, 16, 512), model(input).shape)
 
     def test_fit(self):
-        net = Resnet12()
-        model = models.Model(*net.build_net((256, 256, 3)))
+        net = Resnet12((256, 256, 3))
+        model = net.build_model()
         model.compile(loss='mean_squared_error', optimizer='sgd')
 
         input = np.random.random((2, 256, 256, 3)).astype(np.float32)
@@ -37,8 +37,8 @@ class TestResnet12(unittest.TestCase):
             self.assertFalse(np.allclose(source, target))
 
     def test_freeze(self):
-        net = Resnet12()
-        model = models.Model(*net.build_net((256, 256, 3)))
+        net = Resnet12((256, 256, 3))
+        model = net.build_model()
         net.set_trainable(False)
         model.compile(loss='mean_squared_error', optimizer='sgd')
 
