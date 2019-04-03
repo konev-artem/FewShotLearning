@@ -4,7 +4,7 @@ import numpy as np
 from tensorflow.keras import models
 from tensorflow.keras import backend as K
 
-from basenets.resnet12 import Resnet12
+from basenets.resnet12 import Resnet12, ResidualBlock
 
 
 class TestResnet12(unittest.TestCase):
@@ -13,7 +13,6 @@ class TestResnet12(unittest.TestCase):
         net = Resnet12()
         model = models.Model(*net.build_net((256, 256, 3)))
 
-        np.random.seed(4412442)
         input = np.random.random((2, 256, 256, 3)).astype(np.float32)
         self.assertEqual((2, 16, 16, 512), model(input).shape)
 
@@ -22,7 +21,6 @@ class TestResnet12(unittest.TestCase):
         model = models.Model(*net.build_net((256, 256, 3)))
         model.compile(loss='mean_squared_error', optimizer='sgd')
 
-        np.random.seed(4412442)
         input = np.random.random((2, 256, 256, 3)).astype(np.float32)
         target = np.random.random((2, 16, 16, 512)).astype(np.float32)
 
@@ -44,7 +42,6 @@ class TestResnet12(unittest.TestCase):
         net.set_trainable(False)
         model.compile(loss='mean_squared_error', optimizer='sgd')
 
-        np.random.seed(4412442)
         input = np.random.random((2, 256, 256, 3)).astype(np.float32)
         target = np.random.random((2, 16, 16, 512)).astype(np.float32)
 
@@ -59,6 +56,11 @@ class TestResnet12(unittest.TestCase):
 
         for source, target in zip(conv_weights, new_conv_weights):
             self.assertTrue(np.allclose(source, target))
+
+    def test_compute_residual_block_output_shape(self):
+        conv = ResidualBlock(512)
+        actual = conv.compute_output_shape((2, 256, 256, 3))
+        self.assertTrue((2, 256, 256, 512), actual)
 
     def get_conv_weights(self, convs):
         r = []

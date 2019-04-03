@@ -1,8 +1,9 @@
 from tensorflow.keras import layers, models, activations, backend
 
-
+# ConvNet-N from "A Closer Look at Few-Shot Classification" Wei-Yu Chen.
+# reference implementation: https://github.com/wyharveychen/CloserLookFewShot/blob/master/backbone.py
 class ConvBlock(layers.Layer):
-    def __init__(self,  out_channels, add_maxpool = True, **kwargs):
+    def __init__(self,  out_channels, add_maxpool=True, **kwargs):
         self.conv = layers.Conv2D(out_channels, 3, padding='same')
         self.bn = layers.BatchNormalization()
         self.nl = layers.ReLU()
@@ -30,7 +31,11 @@ class ConvBlock(layers.Layer):
         self.bn.trainable = trainable
 
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], self.out_channels)
+        out_shape = self.conv.compute_output_shape(input_shape)
+        if self.maxpool is not None:
+            out_shape = self.maxpool.compute_output_shape(out_shape)
+
+        return out_shape
 
 
 class ConvNet:

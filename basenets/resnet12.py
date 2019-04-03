@@ -2,9 +2,12 @@ from tensorflow.keras import layers, models, activations, backend
 import tensorflow.keras as K
 
 
+# swish block from  "Searching for activation functions" P. Ramachandran, B. Zoph, and Q. V. Le.
 def swish1(x):
     return x * activations.sigmoid(x)
 
+
+# Resnet-12 from "Dense Classsification and Implanting for Few-Shot Learning" Yann Lifchitz...
 class ResidualBlock(layers.Layer):
     def __init__(self,  out_channels, **kwargs):
         self.conv1 = layers.Conv2D(out_channels, 3, padding='same')
@@ -59,7 +62,7 @@ class ResidualBlock(layers.Layer):
         self.bn_res.trainable = trainable       
         
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], self.out_channels)
+        return self.conv_res.compute_output_shape(input_shape)
     
 
 class Resnet12:
