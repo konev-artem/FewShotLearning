@@ -4,21 +4,20 @@ import random
 
 
 def apply_random_classic_transform(img, p=0.5):
-    transforms = [random_flip, random_crop, random_color_jitter]
+    transforms = [flip, random_crop, random_color_jitter]
     for f in transforms:
         if random.random() < p:
             img = f(img)
     return img
 
 
-def apply_mixed_transform(img1, img2, y1, y2, p=0.5):
+def apply_random_mixed_transform(img1, img2, y1, y2, p=None):
     transforms = [
         mixup, noisy_mixup, between_class, vertical_concat,
-        horizontal_concat, mixed_concat
+        horizontal_concat, random_mixed_concat
         ]
-    for f in transforms:
-        if random.random() < p:
-            img = f(img1, img2, y1, y2)
+    f = np.random.choice(transforms, p=p)
+    img = f(img1, img2, y1, y2)
     return img
 
 
@@ -26,29 +25,22 @@ def crop(img, left, lower, h, w):
     return img[lower:lower+h, left:left+w]
 
 
-def random_crop(img):
-    left = np.random.choice(img.shape[1])
-    lower = np.random.choice(img.shape[0])
-    w = np.random.choice(img.shape[1] - left)
-    h = np.random.choice(img.shape[0] - lower)
-    return crop(img, left, lower, h, w)
+def random_crop(img, crop_width=None, center=False):
+    if crop_width is None:
+        crop_width = np.random.randint(1, img.shape[1])
+    if center:
+        left = int((img.shape[1] - crop_width) / 2)
+    else:
+        left = np.random.randint(img.shape[1] - crop_width)
+    return crop(img, left, left, crop_width, crop_width)
 
 
-def flip(img, direction='horizontal'):
-    if direction == 'horizontal':
-        return cv2.flip(img, 0)
-    if direction == 'vertical':
-        return cv2.flip(img, 1)
-    raise ValueError('direction for flip can be horizontal or vertical')
-
-
-def random_flip(img):
-    direction = np.random.choice(2)
-    return cv2.flip(img, direction)
+def flip(img):
+    return cv2.flip(img, 0)
 
 
 def color_jitter(img, degree=0):
-    hsv = cv2.cvtColor(img1, cv2.COLOR_BGR2HSV)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     hsv = hsv.astype(dtype=np.uint32)
     hsv[:, :, 0] += degree
     hsv[:, :, 0] %= 180
@@ -61,11 +53,11 @@ def random_color_jitter(img):
     return color_jitter(img, degree)
 
 
-def mixup(img1, img2, y1, y2, alpha=1):
+def mixup(input1, input2, y1, y2, alpha=1):
     coeff = np.random.beta(alpha, alpha)
-    img = coeff * img1 + (1 - coeff) * img2
+    output = coeff * input1 + (1 - coeff) * input2
     y = coeff * y1 + (1 - coeff) * y2
-    return (img, y)
+    return (output, y)
 
 
 def constrain(x):
@@ -108,5 +100,23 @@ def horizontal_concat(img1, img2, y1, y2, alpha=1):
     return (np.concatenate((left, right), axis=1), y)
 
 
-def mixed_concat(img1, img2, y1, y2, coeff=1):
-    pass
+def mixed_concat(img1, img2, y1, y2, order=None, alpha=1):
+    if order is None:
+        order=[img1, img2, img2, img1]
+    coeff1, coeff2 = np.random.beta(alpha, alpha, 2)
+    assert(img1.shape == img2.shape)
+    height, width, channels = img1.shape
+    y = (coeff1 * coeff2 + (1 - coeff1) * (1 - coeff2)) * y1 \
+        + (coeff1 * (1 - coeff2) + (1 - coeff1) * coeff2) * y2
+    upper_left = order[0][:int(coeff1 * height), :int(coeff2 * width)]
+    upper_right = order[1][:int(coeff1 * height), int(coeff2 * width):]
+    lower_left = order[2][int(coeff1 * height):, :int(coeff2 * width)]
+    lower_right = order[3][int(coeff1 * height):, int(coeff2 * width):]
+    upper = np.concatenate((upper_left, upper_right), axis=1)
+    lower = np.concatenate((lower_left, lower_right), axis=1)
+    return (np.concatenate((upper, lower)), y)
+
+
+def random_mixed_concat(img1, img2, y1, y2, alpha=1):
+    order = np.random.choice([img1, img2], 4)
+    return mixed_concat(img1, img2, y1, y2, order, alpha)
