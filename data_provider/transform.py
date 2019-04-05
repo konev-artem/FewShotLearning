@@ -1,12 +1,49 @@
 import cv2
 import numpy as np
+import numbers
 import random
 
 
 class Augmentation:
+    def __init__(self, mode='train', make_flip=None, make_crop=None,
+                 left_x=None, bottom_y=None, center=None, crop_size=None,
+                 make_color_jitter=None, hue=0, saturation=0, value=0,
+                 alpha=1):
+        self.mode = mode
+        self.make_flip = make_flip
+        self.make_crop = make_crop
+        self.left_x = left_x
+        self.bottom_y = bottom_y
+        self.center = None
+        self.crop_size = crop_size
+        self.make_color_jitter = make_color_jitter
+        self.hue = hue
+        self.saturation = saturation
+        self.value = value
+        self.alpha = alpha
+
+    def apply_classic_transform(self, img):
+        if self.make_flip:
+            img = self.flip(img)
+        if self.make_crop:
+            if self.left_x and self.bottom_y and self.crop_size:
+                if isinstance(self.crop_size, numbers.Number):
+                    self.crop_size = (int(self.crop_size), int(self.crop_size))
+                img = self.crop(img, self.left_x, self.bottom_y,
+                                self.crop_size[0], self.crop_size[1])
+            else:
+                img = self.random_crop(img, self.crop_size, self.center)
+        if self.make_color_jitter:
+            if self.hue or self.saturation or self.value:
+                img = self.color_jitter(img, self.hue, self.saturation,
+                                        self.value)
+            else:
+                img = self.random_color_jitter(img)
+        return img
+
     def apply_random_classic_transform(self, img, p=[0.5, 0.5, 0.5]):
         transforms = [self.flip, self.random_crop, self.random_color_jitter]
-        for index, transform in transforms:
+        for index, transform in enumerate(transforms):
             if random.random() < p[index]:
                 img = transform(img)
         return img
@@ -24,31 +61,49 @@ class Augmentation:
     def crop(self, img, left, lower, h, w):
         return img[lower:lower+h, left:left+w]
 
-    def random_crop(self, img, crop_width=None, center=False):
-        # TODO: add constrains on crop size, write code for non-square images
-        if crop_width is None:
+    def random_crop(self, img, size=None, center=False):
+        # TODO: add constrains on crop size
+        if isinstance(size, numbers.Number):
+            size = (int(size), int(size))
+        if size is None:
             crop_width = np.random.randint(1, img.shape[1])
+            crop_height = np.random.randint(1, img.shape[0])
+            size = (crop_height, crop_width)
         if center:
-            left = int((img.shape[1] - crop_width) / 2)
+            size = (crop_height, crop_height)
+            left = int((img.shape[1] - size[1]) / 2)
+            lower = int((img.shape[0] - size[0]) / 2)
         else:
-            left = np.random.randint(img.shape[1] - crop_width)
-        return self.crop(img, left, left, crop_width, crop_width)
+            left = np.random.randint(img.shape[1] - size[1])
+            lower = np.random.randint(img.shape[0] - size[0])
+        self.crop_size = size
+        self.left_x = left
+        self.bottom_y = lower
+        return self.crop(img, left, lower, size[0], size[1])
 
     def flip(self, img):
         return cv2.flip(img, 0)
 
-    def color_jitter(self, img, degree=0):
-        # TODO: add saturation and value changes
+    def color_jitter(self, img, hue=0, saturation=0, value=0):
         hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
         hsv = hsv.astype(dtype=np.uint32)
-        hsv[:, :, 0] += degree
+        hsv[:, :, 0] += hue
         hsv[:, :, 0] %= 180
+        hsv[:, :, 1] += saturation
+        hsv[:, :, 1] %= 256
+        hsv[:, :, 2] += value
+        hsv[:, :, 2] %= 256
         hsv = hsv.astype(dtype=np.uint8)
         return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
     def random_color_jitter(self, img):
-        degree = np.random.choice(180)
-        return self.color_jitter(img, degree)
+        hue = np.random.choice(180)
+        self.hue = hue
+        saturation = np.random.choice(256)
+        self.saturation = saturation
+        value = np.random.choice(256)
+        self.value = value
+        return self.color_jitter(img, hue, saturation, value)
 
     def mixup(self, input1, input2, y1, y2, alpha=1):
         """ Implemented mixup from mixup: Beyond Empirical Risk Minimization
@@ -58,14 +113,14 @@ class Augmentation:
         y = coeff * y1 + (1 - coeff) * y2
         return (output, y)
 
-    def constrain(self, x):
+    def _constrain(self, x):
         return max(min(x, 1), 0)
 
     def noisy_mixup(self, img1, img2, y1, y2, alpha=1, scale=0.025):
         coeff = np.random.beta(alpha, alpha)
         y = coeff * y1 + (1 - coeff) * y2
         coeff += np.random.normal(scale=scale, size=(150, 150))
-        coeff = np.vectorize(self.constrain)(coeff)
+        coeff = np.vectorize(self._constrain)(coeff)
         coeff = coeff[:, :, None]
         img = coeff * img1 + (1 - coeff) * img2
         return (img, y)
