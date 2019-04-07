@@ -73,9 +73,9 @@ class Augmentation:
         f = np.random.choice(self.mixed_transforms, p=self.mixed_probs)
         return f(images, labels)
 
-    def apply_transform(self, images, labels):
+    def apply_random_transform(self, images, labels):
         # basic stage
-        images = self.apply_basic_transform(images)
+        images = self.apply_random_basic_transform(images)
         # mixup stage
         images, labels = self.apply_random_mixed_transform(images, labels)
         images = [img.astype(dtype=np.uint8) for img in images]
@@ -148,12 +148,12 @@ class Augmentation:
                                               value)
         return images
 
-    '''Mixup augmentation method.
-    # Reference
-    - [mixup: Beyond Empirical Risk Minimization]
-      (https://arxiv.org/pdf/1710.09412.pdf)
-    '''
     def mixup(self, inputs, labels, alpha=1):
+        '''Mixup augmentation method.
+        # Reference
+        - [mixup: Beyond Empirical Risk Minimization]
+        (https://arxiv.org/pdf/1710.09412.pdf)
+        '''
         coeff = np.random.beta(alpha, alpha)
         output = coeff * inputs[0] + (1 - coeff) * inputs[1]
         y = coeff * labels[0] + (1 - coeff) * labels[1]
@@ -169,12 +169,12 @@ class Augmentation:
         img = coeff * inputs[0] + (1 - coeff) * inputs[1]
         return (img, y)
 
-    '''Between class+ augmentation method.
-    # Reference
-    - [Learning from Between-class Examples for Deep Sound Recognition]
-      (https://arxiv.org/pdf/1711.10282.pdf)
-    '''
     def between_class(self, inputs, labels, coeff=np.random.uniform(0, 1)):
+        '''Between class+ augmentation method.
+        # Reference
+        - [Learning from Between-class Examples for Deep Sound Recognition]
+        (https://arxiv.org/pdf/1711.10282.pdf)
+        '''
         y = coeff * labels[0] + (1 - coeff) * labels[1]
         sigma1 = inputs[0].std()
         sigma2 = inputs[1].std()
@@ -184,12 +184,12 @@ class Augmentation:
         img /= (p**2 + (1 - p)**2)
         return (img, y)
 
-    '''Vertical, horizontal, mixed and random mixed concats.
-    # Reference
-    - [Improved Mixed-Example Data Augmentation]
-      (https://arxiv.org/pdf/1805.11272.pdf)
-    '''
     def vertical_concat(self, inputs, labels, alpha=1):
+        '''Vertical mixed concat.
+        # Reference
+        - [Improved Mixed-Example Data Augmentation]
+      (https://arxiv.org/pdf/1805.11272.pdf)
+        '''
         coeff = np.random.beta(alpha, alpha)
         y = coeff * labels[0] + (1 - coeff) * labels[1]
         upper = inputs[0][:int(coeff * inputs[0].shape[0])]
@@ -197,6 +197,11 @@ class Augmentation:
         return (np.concatenate((upper, lower)), y)
 
     def horizontal_concat(self, inputs, labels, alpha=1):
+        '''Horizontal mixed concat.
+        # Reference
+        - [Improved Mixed-Example Data Augmentation]
+      (https://arxiv.org/pdf/1805.11272.pdf)
+        '''
         coeff = np.random.beta(alpha, alpha)
         y = coeff * labels[0] + (1 - coeff) * labels[1]
         left = inputs[0][:, :int(coeff * inputs[0].shape[1])]
@@ -204,6 +209,11 @@ class Augmentation:
         return (np.concatenate((left, right), axis=1), y)
 
     def mixed_concat(self, inputs, labels, order=None, alpha=1):
+        '''Mixed concat.
+        # Reference
+        - [Improved Mixed-Example Data Augmentation]
+      (https://arxiv.org/pdf/1805.11272.pdf)
+        '''
         if order is None:
             order = [inputs[0], inputs[1], inputs[1], inputs[0]]
         coeff1, coeff2 = np.random.beta(alpha, alpha, 2)
@@ -219,6 +229,11 @@ class Augmentation:
         return (np.concatenate((upper, lower)), y)
 
     def random_mixed_concat(self, inputs, labels, alpha=1):
+        '''Random mixed concat.
+        # Reference
+        - [Improved Mixed-Example Data Augmentation]
+      (https://arxiv.org/pdf/1805.11272.pdf)
+        '''
         order = np.random.choice(len(inputs), 4)
         order = [inputs[i] for i in order]
         return self.mixed_concat(inputs, labels, order, alpha)
