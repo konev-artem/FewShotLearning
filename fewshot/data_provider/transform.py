@@ -6,7 +6,7 @@ import random
 
 class Augmentation:
     def __init__(self, mode='train', make_flip=None, make_crop=None,
-                 left_x=None, bottom_y=None, center=None, crop_size,
+                 left_x=None, bottom_y=None, center=None, crop_size=None,
                  min_crop_size=10, make_color_jitter=None, hue=0,
                  saturation=0, value=0, alpha=1, basic_probs=None,
                  mixed_probs=None):
@@ -24,7 +24,7 @@ class Augmentation:
         self.value = value
         self.alpha = alpha
         self.basic_transforms = [
-                                 self.flip, self.random_crop,
+                                 self.random_flip, self.random_crop,
                                  self.random_color_jitter
                                 ]
         self.mixed_transforms = [
@@ -54,7 +54,7 @@ class Augmentation:
                 img = self.crop(img, self.left_x, self.bottom_y,
                                 self.crop_size[0], self.crop_size[1])
             else:
-                img = self.random_crop(img, self.crop_size, self.center)
+                img = self.random_crop([img])
         if self.make_color_jitter:
             if self.hue or self.saturation or self.value:
                 img = self.color_jitter(img, self.hue, self.saturation,
@@ -63,12 +63,11 @@ class Augmentation:
                 img = self.random_color_jitter(img)
         return img
 
-    def apply_random_basic_transform(self, img):
+    def apply_random_basic_transform(self, images):
         for index, (transform, p) in enumerate(zip(self.basic_transforms,
                                                    self.basic_probs)):
-            if random.random() < p:
-                img = transform(img)
-        return img
+            images = transform(images, p)
+        return images
 
     def apply_random_mixed_transform(self, images, labels):
         f = np.random.choice(self.mixed_transforms, p=self.mixed_probs)
@@ -76,38 +75,52 @@ class Augmentation:
 
     def apply_transform(self, images, labels):
         # basic stage
-        images = [self.apply_random_basic_transform(img) for img in images]
+        images = self.apply_basic_transform(images)
         # mixup stage
         images, labels = self.apply_random_mixed_transform(images, labels)
-        images = [img.astype(dtype=np.uint32) for img in images]
+        images = [img.astype(dtype=np.uint8) for img in images]
         return images, labels
 
     def crop(self, img, left, lower, h, w):
         return img[lower:lower+h, left:left+w]
 
-    def random_crop(self, img):
+    def random_crop(self, images, p=0.5):
+        if random.random() < p:
+            return images
+        if self.mode == 'test':
+            self.center = True
         if isinstance(self.crop_size, numbers.Number):
             self.crop_size = (int(self.crop_size), int(self.crop_size))
         if self.crop_size is None:
             crop_width = np.random.randint(self.min_crop_size[1],
-                                           img.shape[1])
+                                           images[0].shape[1])
             crop_height = np.random.randint(self.min_crop_size[0],
-                                            img.shape[0])
+                                            images[0].shape[0])
             self.crop_size = (crop_height, crop_width)
         if self.center:
             size = (crop_height, crop_height)
-            left = int((img.shape[1] - size[1]) / 2)
-            lower = int((img.shape[0] - size[0]) / 2)
+            left = np.repeat(int((images[0].shape[1] - size[1]) / 2),
+                             len(images))
+            lower = np.repeat(int((images[0].shape[0] - size[0]) / 2),
+                              len(images))
         else:
-            left = np.random.randint(img.shape[1] - self.crop_size[1])
-            lower = np.random.randint(img.shape[0] - self.crop_size[0])
-        self.left_x = left
-        self.bottom_y = lower
-        return self.crop(img, left, lower, self.crop_size[0],
-                         self.crop_size[1])
+            left = np.random.randint(images[0].shape[1] - self.crop_size[1],
+                                     size=len(images))
+            lower = np.random.randint(images[0].shape[0] - self.crop_size[0],
+                                      size=len(images))
+        for index in range(len(images)):
+            images[index] = self.crop(images[index], left[index],
+                                      lower[index], self.crop_size[0],
+                                      self.crop_size[1])
+        return images
 
     def flip(self, img):
         return cv2.flip(img, 0)
+
+    def random_flip(self, images, p=0.5):
+        images = [img if random.random() < p else self.flip(img)
+                  for img in images]
+        return images
 
     def color_jitter(self, img, hue=0, saturation=0, value=0):
         hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
@@ -121,14 +134,19 @@ class Augmentation:
         hsv = hsv.astype(dtype=np.uint8)
         return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
 
-    def random_color_jitter(self, img):
-        hue = np.random.choice(180)
-        self.hue = hue
-        saturation = np.random.choice(256)
-        self.saturation = saturation
-        value = np.random.choice(256)
-        self.value = value
-        return self.color_jitter(img, hue, saturation, value)
+    def random_color_jitter(self, images, p=0.5):
+        if random.random() < p:
+            return images
+        for index in range(len(images)):
+            hue = np.random.choice(180)
+            self.hue = hue
+            saturation = np.random.choice(256)
+            self.saturation = saturation
+            value = np.random.choice(256)
+            self.value = value
+            images[index] = self.color_jitter(images[index], hue, saturation,
+                                              value)
+        return images
 
     '''Mixup augmentation method.
     # Reference
