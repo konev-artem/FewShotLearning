@@ -8,7 +8,7 @@ class ResidualBlock(layers.Layer):
     def __init__(self,  out_channels, activation='swish1', **kwargs):
         self.conv1 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
         self.conv2 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
-        self.conv3 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
+        self.conv3 = convnet.ConvBlock(out_channels, activation, add_maxpool=True)
         
         self.conv_res  = layers.Conv2D(out_channels, 3, padding='same')
         self.bn_res = layers.BatchNormalization()
@@ -27,19 +27,15 @@ class ResidualBlock(layers.Layer):
         
         out = y + z
         out = self.conv3.nl(out)
+        out = self.conv3.maxpool(out)
         
         return out
 
     def set_trainable(self, trainable):
-        self.conv1.trainable = trainable
-        self.bn1.trainable = trainable
+        self.conv1.set_trainable(trainable)
+        self.conv2.set_trainable(trainable)
+        self.conv3.set_trainable(trainable)
 
-        self.conv2.trainable = trainable
-        self.bn2.trainable = trainable
-        
-        self.conv3.trainable = trainable
-        self.bn3.trainable = trainable
-        
         self.conv_res.trainable = trainable
         self.bn_res.trainable = trainable       
         
@@ -50,25 +46,17 @@ class ResidualBlock(layers.Layer):
 class Resnet12:
     def __init__(self, input_size, activation='swish1'):
         self.residual1 = ResidualBlock(64, activation)
-        self.max_pool1 = layers.MaxPool2D(padding='same')
         self.residual2 = ResidualBlock(128, activation)
-        self.max_pool2 = layers.MaxPool2D(padding='same')
         self.residual3 = ResidualBlock(256, activation)
-        self.max_pool3 = layers.MaxPool2D(padding='same')
         self.residual4 = ResidualBlock(512, activation)
-        self.max_pool4 = layers.MaxPool2D(padding='same')
         self.inputs, self.outputs = self._build_net(input_size)
         
     def _build_net(self, input_size):
         input = layers.Input(shape=input_size)
         x = self.residual1(input)
-        x = self.max_pool1(x)
         x = self.residual2(x)
-        x = self.max_pool2(x)
         x = self.residual3(x)
-        x = self.max_pool3(x)
         x = self.residual4(x)
-        x = self.max_pool4(x)       
         return [input], [x]
 
     def build_model(self):
