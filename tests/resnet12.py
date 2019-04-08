@@ -24,10 +24,10 @@ class TestResnet12(unittest.TestCase):
         input = np.random.random((2, 256, 256, 3)).astype(np.float32)
         target = np.random.random((2, 16, 16, 512)).astype(np.float32)
 
-        convs = [net.residual1.conv1, net.residual1.conv2, net.residual1.conv3,
-                 net.residual2.conv1, net.residual2.conv2, net.residual2.conv3,
-                 net.residual3.conv1, net.residual3.conv2, net.residual3.conv3,
-                 net.residual4.conv1, net.residual4.conv2, net.residual4.conv3]
+        convs = [net.residual1.conv1.conv, net.residual1.conv2.conv, net.residual1.conv3.conv,
+                 net.residual2.conv1.conv, net.residual2.conv2.conv, net.residual2.conv3.conv,
+                 net.residual3.conv1.conv, net.residual3.conv2.conv, net.residual3.conv3.conv,
+                 net.residual4.conv1.conv, net.residual4.conv2.conv, net.residual4.conv3.conv]
 
         conv_weights = self.get_conv_weights(convs)
         model.fit(input, target)
@@ -45,10 +45,10 @@ class TestResnet12(unittest.TestCase):
         input = np.random.random((2, 256, 256, 3)).astype(np.float32)
         target = np.random.random((2, 16, 16, 512)).astype(np.float32)
 
-        convs = [net.residual1.conv1, net.residual1.conv2, net.residual1.conv3,
-                 net.residual2.conv1, net.residual2.conv2, net.residual2.conv3,
-                 net.residual3.conv1, net.residual3.conv2, net.residual3.conv3,
-                 net.residual4.conv1, net.residual4.conv2, net.residual4.conv3]
+        convs = [net.residual1.conv1.conv, net.residual1.conv2.conv, net.residual1.conv3.conv,
+                 net.residual2.conv1.conv, net.residual2.conv2.conv, net.residual2.conv3.conv,
+                 net.residual3.conv1.conv, net.residual3.conv2.conv, net.residual3.conv3.conv,
+                 net.residual4.conv1.conv, net.residual4.conv2.conv, net.residual4.conv3.conv]
 
         conv_weights = self.get_conv_weights(convs)
         model.fit(input, target)

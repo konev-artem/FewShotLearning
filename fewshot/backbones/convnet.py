@@ -1,13 +1,17 @@
 from tensorflow.keras import layers, models, activations, backend
 
+# swish block from  "Searching for activation functions" P. Ramachandran, B. Zoph, and Q. V. Le.
+def swish1(x):
+    return x * activations.sigmoid(x)
+
 
 # ConvNet-N from "A Closer Look at Few-Shot Classification" Wei-Yu Chen.
 # reference implementation: https://github.com/wyharveychen/CloserLookFewShot/blob/master/backbone.py
 class ConvBlock(layers.Layer):
-    def __init__(self,  out_channels, add_maxpool=True, **kwargs):
+    def __init__(self, out_channels, activation='relu', add_maxpool=True, **kwargs):
         self.conv = layers.Conv2D(out_channels, 3, padding='same')
         self.bn = layers.BatchNormalization()
-        self.nl = layers.ReLU()
+        self.nl = self.create_activation(activation)
         
         if add_maxpool:
             self.maxpool = layers.MaxPool2D()
@@ -16,6 +20,12 @@ class ConvBlock(layers.Layer):
         
         self.out_channels = out_channels
         super(ConvBlock, self).__init__(**kwargs)
+
+    def create_activation(self, activation):
+        if activation == 'swish1':
+            return layers.Lambda(swish1)
+        else:
+            return layers.Activation(activation)
 
     def call(self, x):
         out = self.conv(x)
@@ -42,9 +52,9 @@ class ConvBlock(layers.Layer):
 class ConvNet:
     def __init__(self, input_size, depth=4):
         self.blocks = []
+        outdim = 64
         for i in range(depth):
-            outdim = 64
-            self.blocks.append(ConvBlock(outdim, i < 4))
+            self.blocks.append(ConvBlock(outdim, add_maxpool=(i < 4)))
         self.inputs, self.outputs = self._build_net(input_size)
 
     def build_model(self):

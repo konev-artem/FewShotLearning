@@ -1,26 +1,14 @@
 from tensorflow.keras import layers, models, activations, backend
 import tensorflow.keras as K
-
-
-# swish block from  "Searching for activation functions" P. Ramachandran, B. Zoph, and Q. V. Le.
-def swish1(x):
-    return x * activations.sigmoid(x)
+import fewshot.backbones.convnet as convnet
 
 
 # Resnet-12 from "Dense Classsification and Implanting for Few-Shot Learning" Yann Lifchitz...
 class ResidualBlock(layers.Layer):
     def __init__(self,  out_channels, activation='swish1', **kwargs):
-        self.conv1 = layers.Conv2D(out_channels, 3, padding='same')
-        self.bn1 = layers.BatchNormalization()
-        self.nl1 = self.create_activation(activation)
-        
-        self.conv2 = layers.Conv2D(out_channels, 3, padding='same')
-        self.bn2 = layers.BatchNormalization()
-        self.nl2 = self.create_activation(activation)
-        
-        self.conv3 = layers.Conv2D(out_channels, 3, padding='same')
-        self.bn3 = layers.BatchNormalization()
-        self.nl3 = self.create_activation(activation)
+        self.conv1 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
+        self.conv2 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
+        self.conv3 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
         
         self.conv_res  = layers.Conv2D(out_channels, 3, padding='same')
         self.bn_res = layers.BatchNormalization()
@@ -28,31 +16,17 @@ class ResidualBlock(layers.Layer):
         self.out_channels = out_channels
         super(ResidualBlock, self).__init__(**kwargs)
 
-    def create_activation(self, activation):
-        if activation == 'relu':
-            return layers.ReLU()
-        elif activation == 'swish1':
-            return layers.Lambda(swish1)
-        else:
-            raise NotImplemented('activation ' + activation + ' not found')
-
     def call(self, x):
         y = self.conv1(x)
-        y = self.bn1(y)
-        y = self.nl1(y)
-               
         y = self.conv2(y)
-        y = self.bn2(y)
-        y = self.nl2(y)
-        
-        y = self.conv3(y)
-        y = self.bn3(y)
-        
+        y = self.conv3.conv(y)
+        y = self.conv3.bn(y)
+
         z = self.conv_res(x)
         z = self.bn_res(z)
         
         out = y + z
-        out = self.nl3(out)
+        out = self.conv3.nl(out)
         
         return out
 

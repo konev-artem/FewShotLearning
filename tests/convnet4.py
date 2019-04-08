@@ -57,7 +57,7 @@ class TestConvnet(unittest.TestCase):
         actual = conv.compute_output_shape((2, 256, 256, 3))
         self.assertTrue((2, 128, 128, 512), actual)
 
-        conv = ConvBlock(512, False)
+        conv = ConvBlock(512, add_maxpool=False)
         actual = conv.compute_output_shape((2, 256, 256, 3))
         self.assertTrue((2, 256, 256, 3), actual)
 
