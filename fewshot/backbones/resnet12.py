@@ -8,9 +8,12 @@ class ResidualBlock(layers.Layer):
     def __init__(self,  out_channels, activation='swish1', **kwargs):
         self.conv1 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
         self.conv2 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
-        self.conv3 = convnet.ConvBlock(out_channels, activation, add_maxpool=True)
-        
-        self.conv_res  = layers.Conv2D(out_channels, 3, padding='same')
+        self.conv3 = convnet.ConvBlock(out_channels, activation=None, add_maxpool=False)
+
+        self.nl = convnet.create_activation(activation)
+        self.maxpool = layers.MaxPool2D()
+
+        self.conv_res = layers.Conv2D(out_channels, 3, padding='same')
         self.bn_res = layers.BatchNormalization()
                 
         self.out_channels = out_channels
@@ -19,15 +22,14 @@ class ResidualBlock(layers.Layer):
     def call(self, x):
         y = self.conv1(x)
         y = self.conv2(y)
-        y = self.conv3.conv(y)
-        y = self.conv3.bn(y)
+        y = self.conv3(y)
 
         z = self.conv_res(x)
         z = self.bn_res(z)
         
         out = y + z
-        out = self.conv3.nl(out)
-        out = self.conv3.maxpool(out)
+        out = self.nl(out)
+        out = self.maxpool(out)
         
         return out
 

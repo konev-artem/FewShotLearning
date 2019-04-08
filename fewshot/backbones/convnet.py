@@ -1,8 +1,16 @@
 from tensorflow.keras import layers, models, activations, backend
 
+
 # swish block from  "Searching for activation functions" P. Ramachandran, B. Zoph, and Q. V. Le.
 def swish1(x):
     return x * activations.sigmoid(x)
+
+
+def create_activation(activation):
+    if activation == 'swish1':
+        return layers.Lambda(swish1)
+    else:
+        return layers.Activation(activation)
 
 
 # ConvNet-N from "A Closer Look at Few-Shot Classification" Wei-Yu Chen.
@@ -11,7 +19,11 @@ class ConvBlock(layers.Layer):
     def __init__(self, out_channels, activation='relu', add_maxpool=True, **kwargs):
         self.conv = layers.Conv2D(out_channels, 3, padding='same')
         self.bn = layers.BatchNormalization()
-        self.nl = self.create_activation(activation)
+
+        if activation is not None:
+            self.nl = create_activation(activation)
+        else:
+            self.nl = None
         
         if add_maxpool:
             self.maxpool = layers.MaxPool2D()
@@ -21,16 +33,12 @@ class ConvBlock(layers.Layer):
         self.out_channels = out_channels
         super(ConvBlock, self).__init__(**kwargs)
 
-    def create_activation(self, activation):
-        if activation == 'swish1':
-            return layers.Lambda(swish1)
-        else:
-            return layers.Activation(activation)
-
     def call(self, x):
         out = self.conv(x)
         out = self.bn(out)
-        out = self.nl(out)
+
+        if self.nl is not None:
+            out = self.nl(out)
         
         if self.maxpool is not None:
             out = self.maxpool(out)
@@ -50,9 +58,8 @@ class ConvBlock(layers.Layer):
 
 
 class ConvNet:
-    def __init__(self, input_size, depth=4):
+    def __init__(self, input_size, outdim=64, depth=4):
         self.blocks = []
-        outdim = 64
         for i in range(depth):
             self.blocks.append(ConvBlock(outdim, add_maxpool=(i < 4)))
         self.inputs, self.outputs = self._build_net(input_size)
