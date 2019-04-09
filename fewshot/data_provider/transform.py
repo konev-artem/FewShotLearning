@@ -8,7 +8,8 @@ class Augmentation:
     def __init__(self, mode='train', flip_prob=0, crop_prob=0,
                  center=None, crop_size=None,
                  color_jitter_prob=0, hue_range=(0, 0.5), saturation_range=(0, 1.0),
-                 value_range=(0, 1.0), mixup_prob=0, between_class_prob=0, vertical_concat_prob=0,
+                 value_range=(0, 1.0), mixup_prob=0, noisy_mixup_prob, 
+                 between_class_prob=0, vertical_concat_prob=0,
                  horizontal_concat_prob=0, mixed_concat_prob=0,
                  alpha=1):
         self.mode = mode
@@ -19,6 +20,7 @@ class Augmentation:
         self.color_jitter_prob = color_jitter_prob
         self.hsv_ranges = (hue_range, saturation_range, value_range)
         self.mixup_prob = mixup_prob
+        self.noisy_mixup_prob = noisy_mixup_prob
         self.between_class_prob = between_class_prob
         self.vertical_concat_prob = vertical_concat_prob
         self.horizontal_concat_prob = horizontal_concat_prob
@@ -29,15 +31,16 @@ class Augmentation:
                                  self.random_color_jitter
                                 ]
         self.mixed_transforms = [
-                                 self.mixup, self.between_class,
-                                 self.vertical_concat,
+                                 self.mixup, self.noisy_mixup,
+                                 self.between_class, self.vertical_concat,
                                  self.horizontal_concat,
                                  self.mixed_concat
                                 ]
         self.basic_probs = [self.flip_prob, self.crop_prob,
                             self.color_jitter_prob]
-        self.mixed_probs = [self.mixup_prob, self.between_class_prob, self.vertical_concat_prob,
-                            self.horizontal_concat_prob, self.mixed_concat_prob]
+        self.mixed_probs = [self.mixup_prob, self.noisy_mixup_prob, self.between_class_prob,
+                            self.vertical_concat_prob, self.horizontal_concat_prob,
+                            self.mixed_concat_prob]
         self.mixup_stage = (sum(self.mixed_probs) > 0)
         if self.mode == 'test':
             self.center = True
@@ -113,7 +116,10 @@ class Augmentation:
             images[index] = self.color_jitter(images[index], self.hsv_factors)
         return images
 
-    def mixup(self, inputs, labels, alpha=1, noisy=False, scale=0.025):
+    def mixup(self, inputs, labels, alpha=1):
+        return self.noisy_mixup(inputs, labels, alpha, noisy=False)
+
+    def noisy_mixup(self, inputs, labels, alpha=1, noisy=True, scale=0.025):
         '''Mixup augmentation method.
         # Reference
         - [mixup: Beyond Empirical Risk Minimization]
