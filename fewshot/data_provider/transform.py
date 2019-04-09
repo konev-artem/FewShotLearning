@@ -7,8 +7,8 @@ import random
 class Augmentation:
     def __init__(self, mode='train', flip_prob=0, crop_prob=0,
                  center=None, crop_size=None,
-                 color_jitter_prob=0, hue_range=0, saturation_range=(0, 0.5),
-                 value_range=(0, 0.5), mixup_prob=0, between_class_prob=0, vertical_concat_prob=0,
+                 color_jitter_prob=0, hue_range=(0, 0.5), saturation_range=(0, 1.0),
+                 value_range=(0, 1.0), mixup_prob=0, between_class_prob=0, vertical_concat_prob=0,
                  horizontal_concat_prob=0, mixed_concat_prob=0,
                  alpha=1):
         self.mode = mode
@@ -94,19 +94,21 @@ class Augmentation:
     def color_jitter(self, img, hsv_factors):
         hue, saturation, value = hsv_factors
         hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+        hsv_img = hsv_img.astype(dtype=np.float32)
         hsv_img[:, :, 0] *= hue
         hsv_img[:, :, 1] *= saturation
         hsv_img[:, :, 2] *= value
-        return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
+        hsv_img = hsv_img.astype(dtype=np.uint8)
+        return cv2.cvtColor(hsv_img, cv2.COLOR_HSV2RGB)
 
-    def random_color_jitter(self, images, hsv):
-        if random.random() > self.color_jitter_prob:
+    def random_color_jitter(self, images, p=0.5):
+        if random.random() > p:
             return images
-        hue, saturation, value = hsv
+        hue, saturation, value = self.hsv_ranges
         for index in range(len(images)):
-            hue_factor = np.random.choice(hue[0], hue[1])
-            saturation_factor = np.random.choice(saturation[0], saturation[1])
-            value_factor = np.random.choice(value[0], value[1])
+            hue_factor = np.random.uniform(hue[0], hue[1])
+            saturation_factor = np.random.uniform(saturation[0], saturation[1])
+            value_factor = np.random.uniform(value[0], value[1])
             self.hsv_factors = (hue_factor, saturation_factor, value_factor)
             images[index] = self.color_jitter(images[index], self.hsv_factors)
         return images
