@@ -174,10 +174,6 @@ class Augmentation:
         - [Improved Mixed-Example Data Augmentation]
       (https://arxiv.org/pdf/1805.11272.pdf)
         '''
-        coeff1, coeff2 = np.random.beta(alpha, alpha, 2)
-        height, width, channels = inputs[0].shape
-        y = (coeff1 * coeff2 + (1 - coeff1) * (1 - coeff2)) * labels[0] \
-            + (coeff1 * (1 - coeff2) + (1 - coeff1) * coeff2) * labels[1]
         img1, y1 = self.vertical_concat([inputs[0], inputs[1]], [labels[0], labels[1]])
         img2, y2 = self.vertical_concat([inputs[1], inputs[0]], [labels[1], labels[0]])
         return self.horizontal_concat([img1, img2], [y1, y2])
