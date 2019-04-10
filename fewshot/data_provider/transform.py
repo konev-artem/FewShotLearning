@@ -7,8 +7,8 @@ import random
 class Augmentation:
     def __init__(self, mode='train', flip_prob=0, crop_prob=0,
                  center=None, crop_size=None,
-                 color_jitter_prob=0, hue_range=(0, 0), saturation_range=(0, 0),
-                 value_range=(0, 0), mixup_prob=0, noisy_mixup_prob=0,
+                 color_jitter_prob=0, hue_range=(1, 1), saturation_range=(1, 1),
+                 value_range=(1, 1), mixup_prob=0, noisy_mixup_prob=0,
                  between_class_prob=0, vertical_concat_prob=0,
                  horizontal_concat_prob=0, mixed_concat_prob=0,
                  alpha=1):
@@ -67,25 +67,22 @@ class Augmentation:
             images = [img.astype(dtype=np.uint8) for img in images]
         return images, labels
 
-    def crop(self, img, left, lower, h, w):
-        return img[lower:lower+h, left:left+w]
+    def crop(self, img, x, y, h, w):
+        return img[y:y+h, x:x+w]
 
     def random_crop(self, images, p=0.5):
         if random.random() > p:
             return images
         for index in range(len(images)):
             if self.center:
-                left = int((images[index].shape[1] - self.crop_size[1]) / 2)
-                lower = int((images[index].shape[0] - self.crop_size[0]) / 2)
+                x = int((images[index].shape[1] - self.crop_size[1]) / 2)
+                y = int((images[index].shape[0] - self.crop_size[0]) / 2)
             else:
-                left = np.random.randint(images[index].shape[1] - self.crop_size[1])
-                lower = np.random.randint(images[index].shape[0] - self.crop_size[0])
+                x = np.random.randint(images[index].shape[1] - self.crop_size[1])
+                y = np.random.randint(images[index].shape[0] - self.crop_size[0])
 
-            orig_shape = images[index].shape[:2]
-            images[index] = self.crop(images[index], left[index],
-                                      lower[index], self.crop_size[0],
-                                      self.crop_size[1])
-            images[index] = cv2.resize(images[index], orig_shape)
+            images[index] = self.crop(images[index], x[index], y[index],
+                                      self.crop_size[0], self.crop_size[1])
         return images
 
     def random_flip(self, images, p=0.5):
@@ -149,31 +146,28 @@ class Augmentation:
         img /= (p**2 + (1 - p)**2)
         return (img, y)
 
-    def vertical_concat(self, inputs, labels, alpha=1):
-        '''Vertical mixed concat.
+    def _concat(self, inputs, labels, alpha=1, axis=0):
+        '''Horizontal and vertical mixed concats.
         # Reference
         - [Improved Mixed-Example Data Augmentation]
       (https://arxiv.org/pdf/1805.11272.pdf)
         '''
         coeff = np.random.beta(alpha, alpha)
         y = coeff * labels[0] + (1 - coeff) * labels[1]
-        upper = inputs[0][:int(coeff * inputs[0].shape[0])]
-        lower = inputs[1][int(coeff * inputs[1].shape[0]):]
-        return (np.concatenate((upper, lower)), y)
+        boundary = int(coeff * inputs[0].shape[axis])
+        first_slice = [slice(None)] * inputs[0].ndim
+        first_slice[axis] = slice(boundary)
+        second_slice = [slice(None)] * inputs[0].ndim
+        second_slice[axis] = slice(boundary, None)
+        return (np.concatenate((inputs[0][first_slice], inputs[1][second_slice]), axis=axis), y)
+
+    def vertical_concat(self, inputs, labels, alpha=1):
+        return self._concat(inputs, labels, alpha=alpha, axis=0)
 
     def horizontal_concat(self, inputs, labels, alpha=1):
-        '''Horizontal mixed concat.
-        # Reference
-        - [Improved Mixed-Example Data Augmentation]
-      (https://arxiv.org/pdf/1805.11272.pdf)
-        '''
-        coeff = np.random.beta(alpha, alpha)
-        y = coeff * labels[0] + (1 - coeff) * labels[1]
-        left = inputs[0][:, :int(coeff * inputs[0].shape[1])]
-        right = inputs[1][:, int(coeff * inputs[1].shape[1]):]
-        return (np.concatenate((left, right), axis=1), y)
+        return self._concat(inputs, labels, alpha=alpha, axis=1)
 
-    def mixed_concat(self, inputs, labels, order=[0, 1, 1, 0], alpha=1):
+    def mixed_concat(self, inputs, labels, alpha=1):
         '''Mixed concat.
         # Reference
         - [Improved Mixed-Example Data Augmentation]
