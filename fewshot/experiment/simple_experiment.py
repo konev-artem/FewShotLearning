@@ -1,15 +1,9 @@
 from .experiment import Experiment, Report
+from ..backbones import ConvNet
+from ..data_provider import Dataset
 
 
 # just for example
-
-
-class Dataset:
-    ...
-
-
-class Backbone:
-    ...
 
 
 class BackboneTrainer:
@@ -39,9 +33,9 @@ class SimpleExperiment(Experiment):
     def __init__(self, config):
         self.config = config
 
-        self.dataset = Dataset()
+        self.dataset = None
 
-        self.backbone_model = Backbone()
+        self.backbone_model = None
         self.fewshot_model = FewShotModel(self.backbone_model)
 
         self.backbone_trainer = BackboneTrainer()
