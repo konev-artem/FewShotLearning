@@ -1,24 +1,24 @@
-from tensorflow.keras import layers, models, activations, backend
+import tensorflow as tf
 
 
 # swish block from  "Searching for activation functions" P. Ramachandran, B. Zoph, and Q. V. Le.
 def swish1(x):
-    return x * activations.sigmoid(x)
+    return x * tf.keras.activations.sigmoid(x)
 
 
 def create_activation(activation):
     if activation == 'swish1':
-        return layers.Lambda(swish1)
+        return tf.keras.layers.Lambda(swish1)
     else:
-        return layers.Activation(activation)
+        return tf.keras.layers.Activation(activation)
 
 
 # ConvNet-N from "A Closer Look at Few-Shot Classification" Wei-Yu Chen.
 # reference implementation: https://github.com/wyharveychen/CloserLookFewShot/blob/master/backbone.py
-class ConvBlock(layers.Layer):
+class ConvBlock(tf.keras.layers.Layer):
     def __init__(self, out_channels, activation='relu', add_maxpool=True, **kwargs):
-        self.conv = layers.Conv2D(out_channels, 3, padding='same')
-        self.bn = layers.BatchNormalization()
+        self.conv = tf.keras.layers.Conv2D(out_channels, 3, padding='same')
+        self.bn = tf.keras.layers.BatchNormalization()
 
         if activation is not None:
             self.nl = create_activation(activation)
@@ -26,7 +26,7 @@ class ConvBlock(layers.Layer):
             self.nl = None
         
         if add_maxpool:
-            self.maxpool = layers.MaxPool2D()
+            self.maxpool = tf.keras.layers.MaxPool2D()
         else:
             self.maxpool = None
         
@@ -65,7 +65,7 @@ class ConvNet:
         self.inputs, self.outputs = self._build_net(input_size)
 
     def build_model(self):
-        return models.Model(self.inputs, self.outputs)
+        return tf.keras.models.Model(self.inputs, self.outputs)
 
     def get_inputs(self):
         return self.inputs
@@ -74,7 +74,7 @@ class ConvNet:
         return self.outputs
 
     def _build_net(self, input_size):
-        input = layers.Input(shape=input_size)
+        input = tf.keras.layers.Input(shape=input_size)
         x = input
         for block in self.blocks:
             x = block(x)

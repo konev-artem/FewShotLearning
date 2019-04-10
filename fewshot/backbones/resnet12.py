@@ -1,5 +1,5 @@
-from tensorflow.keras import layers, models, activations, backend
-import tensorflow.keras as K
+from tensorflow.python.keras import layers, models, activations, backend
+
 import fewshot.backbones.convnet as convnet
 
 
