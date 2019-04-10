@@ -58,6 +58,7 @@ class Augmentation:
         return f(images, labels)
 
     def apply_random_transform(self, images, labels=None):
+        assert(images.dtype == np.uint8)
         # basic stage
         images = self.apply_random_basic_transform(images)
         # mixup stage
