@@ -7,8 +7,8 @@ import random
 class Augmentation:
     def __init__(self, mode='train', flip_prob=0, crop_prob=0,
                  center=None, crop_size=None,
-                 color_jitter_prob=0, hue_range=(0, 0.5), saturation_range=(0, 1.0),
-                 value_range=(0, 1.0), mixup_prob=0, noisy_mixup_prob, 
+                 color_jitter_prob=0, hue_range=(0, 0), saturation_range=(0, 0),
+                 value_range=(0, 0), mixup_prob=0, noisy_mixup_prob=0,
                  between_class_prob=0, vertical_concat_prob=0,
                  horizontal_concat_prob=0, mixed_concat_prob=0,
                  alpha=1):
@@ -73,20 +73,19 @@ class Augmentation:
     def random_crop(self, images, p=0.5):
         if random.random() > p:
             return images
-        if self.center:
-            left = np.repeat(int((images[0].shape[1] - self.crop_size[1]) / 2),
-                             len(images))
-            lower = np.repeat(int((images[0].shape[0] - self.crop_size[0]) / 2),
-                              len(images))
-        else:
-            left = np.random.randint(images[0].shape[1] - self.crop_size[1],
-                                     size=len(images))
-            lower = np.random.randint(images[0].shape[0] - self.crop_size[0],
-                                      size=len(images))
         for index in range(len(images)):
+            if self.center:
+                left = int((images[index].shape[1] - self.crop_size[1]) / 2)
+                lower = int((images[index].shape[0] - self.crop_size[0]) / 2)
+            else:
+                left = np.random.randint(images[index].shape[1] - self.crop_size[1])
+                lower = np.random.randint(images[index].shape[0] - self.crop_size[0])
+
+            orig_shape = images[index].shape[:2]
             images[index] = self.crop(images[index], left[index],
                                       lower[index], self.crop_size[0],
                                       self.crop_size[1])
+            images[index] = cv2.resize(images[index], orig_shape)
         return images
 
     def random_flip(self, images, p=0.5):
@@ -112,8 +111,8 @@ class Augmentation:
             hue_factor = np.random.uniform(hue[0], hue[1])
             saturation_factor = np.random.uniform(saturation[0], saturation[1])
             value_factor = np.random.uniform(value[0], value[1])
-            self.hsv_factors = (hue_factor, saturation_factor, value_factor)
-            images[index] = self.color_jitter(images[index], self.hsv_factors)
+            hsv_factors = (hue_factor, saturation_factor, value_factor)
+            images[index] = self.color_jitter(images[index], hsv_factors)
         return images
 
     def mixup(self, inputs, labels, alpha=1):
