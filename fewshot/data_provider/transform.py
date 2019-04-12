@@ -11,7 +11,7 @@ class Augmentation:
                  value_range=(1, 1), mixup_prob=0, noisy_mixup_prob=0,
                  between_class_prob=0, vertical_concat_prob=0,
                  horizontal_concat_prob=0, mixed_concat_prob=0,
-                 alpha=1):
+                 beta_distr_param=1, mixing_coeff=None):
         self.mode = mode
         self.flip_prob = flip_prob
         self.crop_prob = crop_prob
@@ -25,7 +25,8 @@ class Augmentation:
         self.vertical_concat_prob = vertical_concat_prob
         self.horizontal_concat_prob = horizontal_concat_prob
         self.mixed_concat_prob = mixed_concat_prob
-        self.alpha = alpha
+        self.beta_distr_param = beta_distr_param
+        self.mixing_coeff = mixing_coeff
         self.basic_transforms = [
                                  self.random_flip, self.random_crop,
                                  self.random_color_jitter
@@ -53,9 +54,11 @@ class Augmentation:
             images = transform(images, p)
         return images
 
-    def apply_random_mixed_transform(self, images, labels):
+    def apply_random_mixed_transform(self, images, labels, mixing_coeff=None):
         f = np.random.choice(self.mixed_transforms, p=self.mixed_probs)
-        return f(images, labels)
+        if mixing_coeff is None:
+            mixing_coeff = np.random.beta(self.beta_distr_param, self.beta_distr_param)
+        return f(images, labels, mixing_coeff)
 
     def apply_random_transform(self, images, labels=None):
         assert(images.dtype == np.uint8)
@@ -64,8 +67,8 @@ class Augmentation:
         # mixup stage
         if self.mixup_stage:
             labels = np.asarray(labels, dtype=np.float32)
-            images, labels = self.apply_random_mixed_transform(images, labels)
-            images = [img.astype(dtype=np.uint8) for img in images]
+            images, labels = self.apply_random_mixed_transform(images, labels, self.mixing_coeff)
+        images = np.array(images, dtype='uint8')
         return images, labels
 
     def crop(self, img, x, y, h, w):
@@ -82,7 +85,7 @@ class Augmentation:
                 x = np.random.randint(images[index].shape[1] - self.crop_size[1])
                 y = np.random.randint(images[index].shape[0] - self.crop_size[0])
 
-            images[index] = self.crop(images[index], x[index], y[index],
+            images[index] = self.crop(images[index], x, y,
                                       self.crop_size[0], self.crop_size[1])
         return images
 
@@ -113,67 +116,67 @@ class Augmentation:
             images[index] = self.color_jitter(images[index], hsv_factors)
         return images
 
-    def mixup(self, inputs, labels, alpha=1):
-        return self.noisy_mixup(inputs, labels, alpha, noisy=False)
+    def mixup(self, inputs, labels, mixing_coeff):
+        return self.noisy_mixup(inputs, labels, mixing_coeff, noisy=False)
 
-    def noisy_mixup(self, inputs, labels, alpha=1, noisy=True, scale=0.025):
+    def noisy_mixup(self, inputs, labels, mixing_coeff, noisy=True, scale=0.025):
         '''Mixup augmentation method.
         # Reference
         - [mixup: Beyond Empirical Risk Minimization]
         (https://arxiv.org/pdf/1710.09412.pdf)
         '''
-        coeff = np.random.beta(alpha, alpha)
-        y = coeff * labels[0] + (1 - coeff) * labels[1]
+        y = mixing_coeff * labels[0] + (1 - mixing_coeff) * labels[1]
         if noisy:
-            coeff += np.random.normal(scale=scale, size=(inputs[0].shape[0],
-                                      inputs[0].shape[1]))
-            coeff = np.clip(coeff, 0, 1)
-            coeff = coeff[:, :, None]
-        img = coeff * inputs[0] + (1 - coeff) * inputs[1]
+            mixing_coeff += np.random.normal(scale=scale, size=(inputs[0].shape[0],
+                                             inputs[0].shape[1]))
+            mixing_coeff = np.clip(mixing_coeff, 0, 1)
+            mixing_coeff = mixing_coeff[:, :, None]
+        img = mixing_coeff * inputs[0] + (1 - mixing_coeff) * inputs[1]
         return (img, y)
 
-    def between_class(self, inputs, labels, coeff=np.random.uniform(0, 1)):
+    def between_class(self, inputs, labels, mixing_coeff):
         '''Between class+ augmentation method.
         # Reference
         - [Learning from Between-class Examples for Deep Sound Recognition]
         (https://arxiv.org/pdf/1711.10282.pdf)
         '''
-        y = coeff * labels[0] + (1 - coeff) * labels[1]
+        y = mixing_coeff * labels[0] + (1 - mixing_coeff) * labels[1]
         sigma1 = inputs[0].std()
         sigma2 = inputs[1].std()
-        p = 1 / (1 + sigma1 / sigma2 * (1 - coeff) / coeff)
+        p = 1 / (1 + sigma1 / sigma2 * (1 - mixing_coeff) / mixing_coeff)
         img = p * (inputs[0] - inputs[0].mean()) \
             + (1 - p) * (inputs[1] - inputs[1].mean())
         img /= (p**2 + (1 - p)**2)
         return (img, y)
 
-    def _concat(self, inputs, labels, alpha=1, axis=0):
+    def _concat(self, inputs, labels, mixing_coeff, axis=0):
         '''Horizontal and vertical mixed concats.
         # Reference
         - [Improved Mixed-Example Data Augmentation]
       (https://arxiv.org/pdf/1805.11272.pdf)
         '''
-        coeff = np.random.beta(alpha, alpha)
-        y = coeff * labels[0] + (1 - coeff) * labels[1]
-        boundary = int(coeff * inputs[0].shape[axis])
+        y = mixing_coeff * labels[0] + (1 - mixing_coeff) * labels[1]
+        boundary = int(mixing_coeff * inputs[0].shape[axis])
         first_slice = [slice(None)] * inputs[0].ndim
         first_slice[axis] = slice(boundary)
         second_slice = [slice(None)] * inputs[0].ndim
         second_slice[axis] = slice(boundary, None)
         return (np.concatenate((inputs[0][first_slice], inputs[1][second_slice]), axis=axis), y)
 
-    def vertical_concat(self, inputs, labels, alpha=1):
-        return self._concat(inputs, labels, alpha=alpha, axis=0)
+    def vertical_concat(self, inputs, labels, mixing_coeff):
+        return self._concat(inputs, labels, mixing_coeff, axis=0)
 
-    def horizontal_concat(self, inputs, labels, alpha=1):
-        return self._concat(inputs, labels, alpha=alpha, axis=1)
+    def horizontal_concat(self, inputs, labels, mixing_coeff):
+        return self._concat(inputs, labels, mixing_coeff, axis=1)
 
-    def mixed_concat(self, inputs, labels, alpha=1):
+    def mixed_concat(self, inputs, labels, mixing_coeff):
         '''Mixed concat.
         # Reference
         - [Improved Mixed-Example Data Augmentation]
       (https://arxiv.org/pdf/1805.11272.pdf)
         '''
-        img1, y1 = self.vertical_concat([inputs[0], inputs[1]], [labels[0], labels[1]])
-        img2, y2 = self.vertical_concat([inputs[1], inputs[0]], [labels[1], labels[0]])
-        return self.horizontal_concat([img1, img2], [y1, y2])
+        img1, y1 = self.vertical_concat([inputs[0], inputs[1]], [labels[0], labels[1]],
+                                        mixing_coeff)
+        img2, y2 = self.vertical_concat([inputs[1], inputs[0]], [labels[1], labels[0]],
+                                        mixing_coeff)
+        return self.horizontal_concat([img1, img2], [y1, y2], mixing_coeff)
