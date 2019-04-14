@@ -1,12 +1,13 @@
-from tensorflow.keras import models
+import tensorflow as tf
 
 
-def join_models(base_model, *head_layers_to_apply):
-    outputs = base_model.get_outputs()
-    print(type(head_layers_to_apply))
-    for layer in head_layers_to_apply:
-        if isinstance(outputs, list):
-            outputs = layer(*outputs)
-        else:
-            outputs = layer(outputs)
-    return models.Model(base_model.get_inputs(), outputs)
+def join_models(base_model, head_layer_to_apply):
+    outputs = head_layer_to_apply(*base_model.get_outputs())
+    return tf.keras.models.Model(base_model.get_inputs(), outputs)
+
+
+def reset_weights(model):
+    session = tf.keras.backend.get_session()
+    print(session)
+    for weight in model.trainable_weights:
+        weight.initializer.run(session=session)
