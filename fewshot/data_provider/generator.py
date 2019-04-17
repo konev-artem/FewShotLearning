@@ -2,14 +2,11 @@ import os
 import psutil
 
 import numpy as np
-import pandas as pd
 
-import PIL
-
-from keras_preprocessing import image as keras_img
-from keras_preprocessing.image.iterator import BatchFromFilesMixin, Iterator
-
-from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.preprocessing import image as keras_img
+from tensorflow.keras.preprocessing.image import Iterator
+from tensorflow.python.keras.utils import to_categorical
+from keras_preprocessing.image.iterator import BatchFromFilesMixin
 
 
 class DataFrameIterator(BatchFromFilesMixin, Iterator):
@@ -79,7 +76,7 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
         self.y = dataframe[y_col]
         self.index = dataframe.index.values
 
-        self.classes = self.y.unique()
+        self.classes = sorted(self.y.unique())
         self.n_classes = len(self.classes)
         self.encoding = {class_name: to_categorical(class_index, num_classes=self.n_classes) \
                          for class_index, class_name in enumerate(self.classes)}

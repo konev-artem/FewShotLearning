@@ -1,16 +1,16 @@
-from tensorflow.keras import layers, models, activations, backend
-import tensorflow.keras as K
-import fewshot.backbones.convnet as convnet
+from tensorflow.python.keras import layers, models, activations, backend
+
+from .convnet import ConvBlock, create_activation
 
 
 # Resnet-12 from "Dense Classsification and Implanting for Few-Shot Learning" Yann Lifchitz...
 class ResidualBlock(layers.Layer):
     def __init__(self,  out_channels, activation='swish1', **kwargs):
-        self.conv1 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
-        self.conv2 = convnet.ConvBlock(out_channels, activation, add_maxpool=False)
-        self.conv3 = convnet.ConvBlock(out_channels, activation=None, add_maxpool=False)
+        self.conv1 = ConvBlock(out_channels, activation, add_maxpool=False)
+        self.conv2 = ConvBlock(out_channels, activation, add_maxpool=False)
+        self.conv3 = ConvBlock(out_channels, activation=None, add_maxpool=False)
 
-        self.nl = convnet.create_activation(activation)
+        self.nl = create_activation(activation)
         self.maxpool = layers.MaxPool2D()
 
         self.conv_res = layers.Conv2D(out_channels, 3, padding='same')
