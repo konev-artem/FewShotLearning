@@ -5,7 +5,7 @@ from ..data_provider import Dataset
 from enum import Enum
 
 
-class SimpleExperiment(Experiment):
+class BaselineExperiment(Experiment):
     """Basic experiment with metric learning approach"""
 
     class BackboneType(str, Enum):

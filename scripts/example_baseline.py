@@ -1,4 +1,4 @@
-from fewshot.experiment import SimpleExperiment
+from fewshot.experiment import BaselineExperiment
 
 import argparse
 import os
@@ -8,9 +8,9 @@ import os
 parser = argparse.ArgumentParser(description='Baseline Few Shot Experiment')
 parser.add_argument('--dataset_dir', type=str, required=True,
                     help="Path to dataset")
-parser.add_argument('--backbone_type', type=str, default=SimpleExperiment.BackboneType.CONVNET,
+parser.add_argument('--backbone_type', type=str, default=BaselineExperiment.BackboneType.CONVNET,
                     help="Type of backbone network",
-                    choices=SimpleExperiment.get_availible_backbone_types())
+                    choices=BaselineExperiment.get_availible_backbone_types())
 parser.add_argument('--backbone_input_size', type=int, default=64,
                     help="Width and height of backbone first layer input"
                          "Images will be rescaled to this size")
@@ -53,7 +53,7 @@ config = {
 
 
 # ... create experiment ...
-experiment = SimpleExperiment(config)
+experiment = BaselineExperiment(config)
 
 # ... run experiment ...
 report = experiment.run()
