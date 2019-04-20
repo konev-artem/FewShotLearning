@@ -18,15 +18,13 @@ class BaselineExperiment(Experiment):
         # prepare datasets
         self.dataset = Dataset(config["dataset"]["dataset_dir"])
 
-        # FIXME: actually not proper way to subset backbone dataset by putting
-        # it to test position
-        self.fewshot_dataset, self.backbone_dataset = self.dataset.split_by_classes(
-            test_size=config["dataset"]["backbone_dataset_size"]
+        self.backbone_dataset, self.fewshot_dataset = self.dataset.split_by_classes(
+            train_size=config["dataset"]["backbone_dataset_size"]
         )
 
         self.backbone_train_dataset, self.backbone_val_dataset = (
             self.backbone_dataset.split_by_objects(
-                test_size=config["dataset"]["backbone_val_size"]))
+                train_size=config["dataset"]["backbone_train_size"]))
 
         # prepare backbone
         width = height = config["backbone"]["input_size"]
@@ -40,6 +38,13 @@ class BaselineExperiment(Experiment):
     @classmethod
     def get_availible_backbone_types(cls):
         return [backbone_type.value for backbone_type in cls.BackboneType]
+
+    def save(self, path):
+        ...
+
+    @staticmethod
+    def load(cls, path):
+        ...
 
     def run(self):
         # .. train backbone ...

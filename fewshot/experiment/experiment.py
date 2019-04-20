@@ -15,6 +15,17 @@ class Experiment(ABC):
         """
         ...
 
+    @abstractmethod
+    def save(self, path):
+        """Save experiment"""
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def load(cls, path):
+        """Load experiment"""
+        ...
+
 
 class Report:
     """Class to represent experiment results"""
