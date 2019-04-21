@@ -1,12 +1,13 @@
 import os
 import copy
 import pickle
+from itertools import chain
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from keras_preprocessing.image import ImageDataGenerator as Transformer # will change for custom implementation later
 
 from fewshot.data_provider.generator import DataFrameIterator, FewShotDataFrameIterator
+from fewshot.data_provider.transform import Augmentation
 
 
 class Dataset:
@@ -15,6 +16,7 @@ class Dataset:
                  csv_name='data.csv',
                  x_col='filepath',
                  y_col='class',
+                 image_size=(84,84),
                  cache=None):
 
         self.dataset_dir = dataset_dir
@@ -22,6 +24,7 @@ class Dataset:
 
         self.x_col = x_col
         self.y_col = y_col
+        self.image_size = image_size
 
         self.cache = cache
         if isinstance(self.cache, str):
@@ -37,6 +40,7 @@ class Dataset:
         self.n_samples = len(self.dataframe)
         self.classes = sorted(self.dataframe[self.y_col].unique())
         self.n_classes = len(self.classes)
+        self.class_index = dict(self.dataframe.groupby([self.y_col]).indices)
 
     def load_cache(self, cache_file):
         try:
@@ -64,7 +68,7 @@ class Dataset:
 
     def _create_subset(self, index):
         dataset = copy.deepcopy(self)
-        dataset.dataframe = self.dataframe.loc[index]
+        dataset.dataframe = dataset.dataframe.iloc[index]
         dataset._recompute_statistics()
         return dataset
 
@@ -76,59 +80,52 @@ class Dataset:
                                                            random_state=random_state)
         print('Train classes: {}'.format(len(train_classes)))
         print('Test classes: {}'.format(len(test_classes)))
-
-        train_index = list(self.dataframe[self.dataframe[self.y_col].isin(train_classes)].index)
-        print(train_index)
-        test_index = self.dataframe[self.dataframe[self.y_col].isin(test_classes)].index
+        train_index = list(chain(*[self.class_index[class_name] for class_name in train_classes]))
+        test_index = list(chain(*[self.class_index[class_name] for class_name in test_classes]))
         return self._create_split(train_index, test_index)
 
     def split_by_objects(self, train_size=0.5, random_state=42):
         print('Split by objects with train size = {} (seed = {})'.format(train_size, random_state))
-        train_index = []
-        test_index = []
-        for class_name in self.classes:
-            class_index = list(self.dataframe[self.dataframe[self.y_col]==class_name].index) #TODO: do it more efficiently
-            class_train_index, class_test_index = train_test_split(class_index,
-                                                                   train_size=train_size,
-                                                                   random_state=random_state)
-            train_index += class_train_index
-            test_index += class_test_index
-
+        train_index, test_index = zip(*([
+            train_test_split(class_index, train_size=train_size, random_state=random_state) \
+            for class_index in self.class_index.values()
+        ]))
+        train_index = list(chain(*train_index))
+        test_index = list(chain(*test_index))
         return self._create_split(train_index, test_index)
 
     def get_batch_generator(self,
                             batch_size,
-                            n_mix=1,
                             generator_args={},
                             **kwargs):
         return DataFrameIterator(self.dataframe,
                                  self.dataset_dir,
-                                 Transformer(**generator_args),
+                                 Augmentation(**generator_args),
                                  x_col=self.x_col,
                                  y_col=self.y_col,
-                                 n_mix=n_mix,
+                                 target_size=self.image_size,
                                  batch_size=batch_size,
                                  seed=42,
                                  interpolation='bilinear',
                                  cache=self.cache,
                                  **kwargs)
 
-    def get_few_shot_generator(self,
-                               n_way,
-                               k_shot,
-                               query_samples_per_class=None,
-                               support_generator_args={},
-                               query_generator_args={},
-                               **kwargs):
+    def get_fewshot_generator(self,
+                              k_shot,
+                              max_query_samples_per_class=None,
+                              support_generator_args={},
+                              query_generator_args={},
+                              **kwargs):
         return FewShotDataFrameIterator(self.dataframe,
                                         self.dataset_dir,
-                                        Transformer(**support_generator_args),
-                                        Transformer(**query_generator_args),
-                                        n_way=n_way,
+                                        Augmentation(**support_generator_args),
+                                        Augmentation(**query_generator_args),
+                                        class_index=self.class_index,
                                         k_shot=k_shot,
-                                        query_samples_per_class=query_samples_per_class,
+                                        max_query_samples_per_class=max_query_samples_per_class,
                                         x_col=self.x_col,
                                         y_col=self.y_col,
+                                        target_size=self.image_size,
                                         seed=42,
                                         interpolation='bilinear',
                                         cache=self.cache,

@@ -2,11 +2,12 @@ import os
 import psutil
 
 import numpy as np
+import cv2
 
-from tensorflow.keras.preprocessing import image as keras_img
 from tensorflow.keras.preprocessing.image import Iterator
 from tensorflow.python.keras.utils import to_categorical
 from keras_preprocessing.image.iterator import BatchFromFilesMixin
+from sklearn.model_selection import train_test_split
 
 
 class DataFrameIterator(BatchFromFilesMixin, Iterator):
@@ -47,9 +48,8 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
                  image_data_generator,
                  x_col,
                  y_col,
-                 target_size=(224, 224),
+                 target_size=(84, 84),
                  batch_size=32,
-                 n_mix=1,
                  shuffle=False,
                  seed=42,
                  interpolation='bilinear',
@@ -58,11 +58,13 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
                  dtype='float32',
                  return_info=False,
                  cache=None,
-                 max_memory_used=0.5,
-                 min_space_available=500*1024*1024):
+                 max_memory_used=0.5):
+
+        crop_size = image_data_generator.get_crop_size()
+        self.target_size = crop_size if crop_size is not None else target_size
 
         super(DataFrameIterator, self).set_processing_attrs(image_data_generator,
-                                                            target_size,
+                                                            self.target_size,
                                                             'rgb',
                                                             data_format,
                                                             save_to_dir=False,
@@ -70,6 +72,7 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
                                                             save_format='png',
                                                             subset=subset,
                                                             interpolation=interpolation)
+
         assert (set((x_col, y_col))) <= set(dataframe.columns)
 
         self.x = dataframe[x_col].astype(str)
@@ -91,15 +94,17 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
         self.set_cache(cache)
 
         self.max_memory_used = max_memory_used
-        self.min_space_available = min_space_available
 
-        self.n_mix = n_mix
+        self.num_images_in_augmentation = image_data_generator.get_num_images_in_augmentation()
 
         super(DataFrameIterator, self).__init__(
             self.num_samples,
             batch_size,
             shuffle,
             seed)
+
+    def get_encoding(self):
+        return self.encoding
 
     def set_cache(self, cache):
         if self.use_cache:
@@ -108,39 +113,30 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
                 print('Set empty cache')
         self.cache = cache
 
-    def memory_safe(self):
+    def _memory_safe(self):
         mem = psutil.virtual_memory()
-        return (mem.percent < self.max_memory_used * 100. and mem.available > self.min_space_available)
+        return mem.percent < self.max_memory_used * 100.
 
     def _get_image(self, filename):
         filepath = os.path.join(self.directory, filename)
         if self.use_cache and filepath in self.cache:
-            img_arr = self.cache[filepath]
+            img = self.cache[filepath]
         else:
-            img = keras_img.load_img(filepath, target_size=self.target_size, interpolation=self.interpolation)
-            img_arr = keras_img.img_to_array(img)
-            if self.use_cache and self.memory_safe():
-                self.cache[filepath] = img_arr
+            img = cv2.imread(filepath)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            if self.use_cache and self._memory_safe():
+                self.cache[filepath] = img
 
-        if img_arr is None:
+        if img is None:
             return None
 
-        return img_arr.copy()
+        return img.copy()
 
     def _transform_samples(self, x, y, image_data_generator=None):
-        if image_data_generator is not None:
-            seed = np.random.randint(1000000)
-            params = self.image_data_generator.get_random_transform(self.target_size, seed)
-            transformed_x, transformed_y = self.image_data_generator.apply_transform(x[0], params), y[0]
-            #will replace three lines above with the following line:
-            #transformed_x, transformed_y = self.image_data_generator.apply_transform(x, y, params)
-        else:
-            assert len(x) == 1
-            transformed_x = x[0]
-            transformed_y = y[0]
+        transformed_x, transformed_y = image_data_generator.apply_random_transform(x, y)
         return transformed_x, transformed_y
 
-    def _get_batches_of_transformed_samples(self, index_arrays, image_data_generator=None):
+    def _get_batches_of_transformed_samples(self, index_arrays, image_data_generator):
         batch_size = len(index_arrays[0])
         batch_x = np.zeros((batch_size, self.target_size[0], self.target_size[1], 3), dtype=self.dtype)
         batch_y = np.zeros((batch_size, self.n_classes))
@@ -169,7 +165,7 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
             The next batch.
         """
         with self.lock:
-            index_arrays = [next(self.index_generator) for _ in range(self.n_mix)]
+            index_arrays = [next(self.index_generator) for _ in range(self.num_images_in_augmentation)]
         # The transformation of images is not under thread lock
         # so it can be done in parallel
         return self._get_batches_of_transformed_samples(index_arrays, self.image_data_generator)
@@ -181,18 +177,27 @@ class FewShotDataFrameIterator(DataFrameIterator):
                  directory,
                  image_data_generator,
                  query_image_data_generator,
-                 n_way,
+                 class_index,
                  k_shot,
-                 query_samples_per_class=None,
+                 max_query_samples_per_class=None,
                  *args, **kwargs):
         super(FewShotDataFrameIterator, self).__init__(dataframe,
                                                        directory,
                                                        image_data_generator=image_data_generator,
                                                        *args, **kwargs)
         self.query_image_data_generator = query_image_data_generator
-        self.n_way = n_way
         self.support_samples_per_class = k_shot
-        self.query_samples_per_class = query_samples_per_class
+        self.max_query_samples_per_class = max_query_samples_per_class \
+            if max_query_samples_per_class is not None else np.inf
+        self.class_index = class_index
+        self.num_images_in_support_augmentation = image_data_generator.get_num_images_in_augmentation()
+        self.num_images_in_query_augmentation = query_image_data_generator.get_num_images_in_augmentation()
+
+    def _adjust(self, index, size, num_images_in_augmentation):
+        size = max(int(size * num_images_in_augmentation), 1)
+        if len(index) < size:
+            index = np.random.choice(index, size=size, replace=True)
+        return index[:size].reshape((num_images_in_augmentation, -1))
 
     def next(self):
         """For python 2.x.
@@ -200,28 +205,40 @@ class FewShotDataFrameIterator(DataFrameIterator):
             The next batch.
         """
         with self.lock:
-            sample_classes = np.random.choice(self.classes, self.n_way)
-            support_index_arrays = [[] for _ in range(self.n_mix)]
-            query_index_arrays = [[] for _ in range(self.n_mix)]
-            for class_name in sample_classes:
-                class_index = self.y[self.y==class_name].index
-                support_class_multiindex = np.random.choice(
-                        class_index, size=self.support_samples_per_class * self.n_mix,
-                        replace=len(class_index) < self.support_samples_per_class)
-                query_class_index = [index for index in class_index if not index in support_class_multiindex]
-                support_class_multiindex = support_class_multiindex.reshape((self.n_mix, -1)).tolist()
-                for index_in_mix, support_class_index in enumerate(support_class_multiindex):
-                    if self.query_samples_per_class is not None:
-                        query_size = min(self.query_samples_per_class, len(query_class_index))
-                    else:
-                        query_size = len(query_class_index)
+            support_index_arrays = None
+            query_index_arrays = None
+            for class_index in self.class_index.values():
+                desired_support_samples = (self.support_samples_per_class
+                                           * self.num_images_in_support_augmentation)
 
-                    query_class_index = np.random.choice(query_class_index, size=query_size).tolist()
-                    support_index_arrays[index_in_mix] += support_class_index
-                    query_index_arrays[index_in_mix] += query_class_index
+                if np.isfinite(self.max_query_samples_per_class):
+                    desired_query_samples = (self.max_query_samples_per_class
+                                             * self.num_images_in_query_augmentation)
+                else:
+                    desired_query_samples = self.num_images_in_query_augmentation
 
-        # The transformation of images is not under thread lock
-        # so it can be done in parallel
-        support = self._get_batches_of_transformed_samples(support_index_arrays, self.image_data_generator)
-        query = self._get_batches_of_transformed_samples(query_index_arrays, self.query_image_data_generator)
+                desired_samples = desired_support_samples + desired_query_samples
+                if len(class_index) < desired_samples:
+                    train_size = desired_support_samples / float(desired_samples)
+                else:
+                    train_size = desired_support_samples
+
+                support_index, query_index = train_test_split(class_index, train_size=train_size)
+                support_index = self._adjust(support_index, self.support_samples_per_class,
+                                             self.num_images_in_support_augmentation)
+
+                query_samples = min(len(query_index) // self.num_images_in_augmentation,
+                                    self.max_query_samples_per_class)
+                query_index = self._adjust(query_index, query_samples,
+                                           self.num_images_in_query_augmentation)
+
+                support_index_arrays = support_index if support_index_arrays is None \
+                    else np.concatenate([support_index_arrays, support_index], axis=1)
+                query_index_arrays = query_index if query_index_arrays is None \
+                    else np.concatenate([query_index_arrays, query_index], axis=1)
+
+            # The transformation of images is not under thread lock
+            # so it can be done in parallel
+            support = self._get_batches_of_transformed_samples(support_index_arrays, self.image_data_generator)
+            query = self._get_batches_of_transformed_samples(query_index_arrays, self.query_image_data_generator)
         return support, query
