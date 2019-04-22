@@ -179,7 +179,7 @@ class FewShotDataFrameIterator(DataFrameIterator):
                  query_image_data_generator,
                  class_index,
                  k_shot,
-                 max_query_samples_per_class=None,
+                 query_samples_per_class=None,
                  *args, **kwargs):
         super(FewShotDataFrameIterator, self).__init__(dataframe,
                                                        directory,
@@ -187,17 +187,20 @@ class FewShotDataFrameIterator(DataFrameIterator):
                                                        *args, **kwargs)
         self.query_image_data_generator = query_image_data_generator
         self.support_samples_per_class = k_shot
-        self.max_query_samples_per_class = max_query_samples_per_class \
-            if max_query_samples_per_class is not None else np.inf
+        self.query_samples_per_class = query_samples_per_class \
+            if query_samples_per_class is not None else np.inf
         self.class_index = class_index
         self.num_images_in_support_augmentation = image_data_generator.get_num_images_in_augmentation()
         self.num_images_in_query_augmentation = query_image_data_generator.get_num_images_in_augmentation()
 
     def _adjust(self, index, size, num_images_in_augmentation):
-        size = max(int(size * num_images_in_augmentation), 1)
-        if len(index) < size:
-            index = np.random.choice(index, size=size, replace=True)
-        return index[:size].reshape((num_images_in_augmentation, -1))
+        if np.isfinite(size):
+            size = int(max(size * num_images_in_augmentation, 1))
+            if len(index) < size:
+                index = np.random.choice(index, size=size, replace=True)
+            else:
+                index = index[:size]
+        return index.reshape((num_images_in_augmentation, -1))
 
     def next(self):
         """For python 2.x.
@@ -211,25 +214,23 @@ class FewShotDataFrameIterator(DataFrameIterator):
                 desired_support_samples = (self.support_samples_per_class
                                            * self.num_images_in_support_augmentation)
 
-                if np.isfinite(self.max_query_samples_per_class):
-                    desired_query_samples = (self.max_query_samples_per_class
+                if np.isfinite(self.query_samples_per_class):
+                    desired_query_samples = (self.query_samples_per_class
                                              * self.num_images_in_query_augmentation)
                 else:
                     desired_query_samples = self.num_images_in_query_augmentation
 
                 desired_samples = desired_support_samples + desired_query_samples
                 if len(class_index) < desired_samples:
-                    train_size = desired_support_samples / float(desired_samples)
+                    train_size = max(desired_support_samples / float(desired_samples),
+                                     1. / len(class_index))
                 else:
                     train_size = desired_support_samples
 
                 support_index, query_index = train_test_split(class_index, train_size=train_size)
                 support_index = self._adjust(support_index, self.support_samples_per_class,
                                              self.num_images_in_support_augmentation)
-
-                query_samples = min(len(query_index) // self.num_images_in_augmentation,
-                                    self.max_query_samples_per_class)
-                query_index = self._adjust(query_index, query_samples,
+                query_index = self._adjust(query_index, self.query_samples_per_class,
                                            self.num_images_in_query_augmentation)
 
                 support_index_arrays = support_index if support_index_arrays is None \

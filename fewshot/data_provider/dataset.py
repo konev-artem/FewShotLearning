@@ -112,7 +112,7 @@ class Dataset:
 
     def get_fewshot_generator(self,
                               k_shot,
-                              max_query_samples_per_class=None,
+                              query_samples_per_class=None,
                               support_generator_args={},
                               query_generator_args={},
                               **kwargs):
@@ -122,7 +122,7 @@ class Dataset:
                                         Augmentation(**query_generator_args),
                                         class_index=self.class_index,
                                         k_shot=k_shot,
-                                        max_query_samples_per_class=max_query_samples_per_class,
+                                        query_samples_per_class=query_samples_per_class,
                                         x_col=self.x_col,
                                         y_col=self.y_col,
                                         target_size=self.image_size,
