@@ -15,7 +15,6 @@ def build_one_layer_classifier(backbone, n_classes):
 
 def _train(model, loss, optimizer, n_epochs, train_generator, validation_generator):
     model.compile(optimizer, loss, metrics=["accuracy"])
-
     model.fit_generator(
         train_generator,
         epochs=n_epochs,
@@ -23,7 +22,7 @@ def _train(model, loss, optimizer, n_epochs, train_generator, validation_generat
         use_multiprocessing=False,
         workers=0  # TODO: Override __getitem__ method in fewshot.data_provider.generator.DataFrameIterator
     )
-    return model
+    return model  # TODO: should we return classifier or just backbone?
 
 
 def cross_entropy_train(
@@ -37,3 +36,10 @@ def cross_entropy_train(
         train_generator=train_dataset,
         validation_generator=validation_dataset
     )
+
+
+def simple_one_layer_cross_entropy_train(
+        backbone, train_dataset, validation_dataset=None, n_epochs=1, optimizer="adam"):
+    backbone_classifier = build_one_layer_classifier(backbone, train_dataset.n_classes)
+    return cross_entropy_train(backbone_classifier, train_dataset, validation_dataset,
+                               n_epochs, optimizer)
