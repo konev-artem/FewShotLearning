@@ -4,3 +4,4 @@ tqdm
 Pillow
 psutil
 opencv-contrib-python
+scipy

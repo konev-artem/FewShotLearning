@@ -30,8 +30,12 @@ class Experiment(ABC):
 class Report:
     """Class to represent experiment results"""
 
-    def __init__(self, metric):
-        self.metric = metric
+    def __init__(self, mean_accuracy, conf_interval):
+        self.mean_accuracy = mean_accuracy
+        self.conf_interval = conf_interval
 
     def __repr__(self):
-        return "Metric: {:.3f}".format(self.metric)
+        return "Metric: {:.2f}% +- {:.2f}%".format(
+            self.mean_accuracy * 100,
+            (self.mean_accuracy - self.conf_interval[0]) * 100
+        )
