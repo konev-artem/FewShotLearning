@@ -5,16 +5,26 @@ import random
 
 
 class Augmentation:
-    def __init__(self, mode='train', flip_prob=0, crop_prob=0,
-                 center=None, crop_size=None,
-                 color_jitter_prob=0, hue_range=(1, 1), saturation_range=(1, 1),
-                 value_range=(1, 1), mixup_prob=0, noisy_mixup_prob=0,
-                 between_class_prob=0, vertical_concat_prob=0,
-                 horizontal_concat_prob=0, mixed_concat_prob=0,
-                 beta_distr_param=1, mixing_coeff=None):
+    def __init__(self,
+                 mode='train',
+                 flip_prob=0,
+                 center=None,
+                 crop_size=None,
+                 color_jitter_prob=0,
+                 hue_range=(1, 1),
+                 saturation_range=(1, 1),
+                 value_range=(1, 1),
+                 mixup_prob=0,
+                 noisy_mixup_prob=0,
+                 between_class_prob=0,
+                 vertical_concat_prob=0,
+                 horizontal_concat_prob=0,
+                 mixed_concat_prob=0,
+                 beta_distr_param=1,
+                 num_images_in_mixup=1,
+                 mixing_coeff=None):
         self.mode = mode
         self.flip_prob = flip_prob
-        self.crop_prob = crop_prob
         self.center = center
         self.crop_size = crop_size
         self.color_jitter_prob = color_jitter_prob
@@ -26,9 +36,10 @@ class Augmentation:
         self.horizontal_concat_prob = horizontal_concat_prob
         self.mixed_concat_prob = mixed_concat_prob
         self.beta_distr_param = beta_distr_param
+        self.num_images_in_mixup = num_images_in_mixup
         self.mixing_coeff = mixing_coeff
         self.basic_transforms = [
-                                 self.random_flip, self.random_crop,
+                                 self.random_flip,
                                  self.random_color_jitter
                                 ]
         self.mixed_transforms = [
@@ -37,16 +48,38 @@ class Augmentation:
                                  self.horizontal_concat,
                                  self.mixed_concat
                                 ]
-        self.basic_probs = [self.flip_prob, self.crop_prob,
-                            self.color_jitter_prob]
-        self.mixed_probs = [self.mixup_prob, self.noisy_mixup_prob, self.between_class_prob,
+        self.basic_probs = [
+                            self.flip_prob,
+                            self.color_jitter_prob
+                           ]
+        self.mixed_probs = [
+                            self.mixup_prob, self.noisy_mixup_prob, self.between_class_prob,
                             self.vertical_concat_prob, self.horizontal_concat_prob,
-                            self.mixed_concat_prob]
+                            self.mixed_concat_prob
+                           ]
         self.mixup_stage = (sum(self.mixed_probs) > 0)
+        if self.mixup_stage and self.num_images_in_mixup == 1:
+            raise ValueError('Need more than 1 image to apply mix-ups')
+
+        if not self.mixup_stage and self.num_images_in_mixup > 1:
+            raise ValueError('Need precisely 1 image to apply basic augmentations')
+
+        if self.num_images_in_mixup > 2:
+            raise ValueError('''Need precisely 2 images to apply mix-ups;
+                                other values are not currently supported''')
+
         if self.mode == 'test':
             self.center = True
+
+        self.make_crop = self.crop_size is not None
         if isinstance(self.crop_size, numbers.Number):
             self.crop_size = (int(self.crop_size), int(self.crop_size))
+
+    def get_crop_size(self):
+        return self.crop_size
+
+    def get_num_images_in_augmentation(self):
+        return self.num_images_in_mixup
 
     def apply_random_basic_transform(self, images):
         for index, (transform, p) in enumerate(zip(self.basic_transforms,
@@ -61,33 +94,41 @@ class Augmentation:
         return f(images, labels, mixing_coeff)
 
     def apply_random_transform(self, images, labels=None):
-        assert(images.dtype == np.uint8)
+        assert all([images[index].dtype == np.uint8 for index in range(len(images))])
+        # crop
+        images = self.random_crop(images)
         # basic stage
         images = self.apply_random_basic_transform(images)
         # mixup stage
         if self.mixup_stage:
-            labels = np.asarray(labels, dtype=np.float32)
-            images, labels = self.apply_random_mixed_transform(images, labels, self.mixing_coeff)
-        images = np.array(images, dtype='uint8')
-        return images, labels
+            labels = np.stack(labels).astype(np.float32)
+            img, label = self.apply_random_mixed_transform(images, labels, self.mixing_coeff)
+        else:
+            img, label = images[0], labels[0]
+        img = np.array(np.clip(img, 0, 255), dtype='uint8')
+        return img, label
 
-    def crop(self, img, x, y, h, w):
-        return img[y:y+h, x:x+w]
+    def crop(self, img, x, y):
+        return img[y:y + self.crop_size[0], x:x + self.crop_size[1]]
 
-    def random_crop(self, images, p=0.5):
-        if random.random() > p:
+    def random_crop(self, images):
+        if not self.make_crop:
             return images
-        for index in range(len(images)):
-            if self.center:
-                x = int((images[index].shape[1] - self.crop_size[1]) / 2)
-                y = int((images[index].shape[0] - self.crop_size[0]) / 2)
-            else:
-                x = np.random.randint(images[index].shape[1] - self.crop_size[1])
-                y = np.random.randint(images[index].shape[0] - self.crop_size[0])
 
-            images[index] = self.crop(images[index], x, y,
-                                      self.crop_size[0], self.crop_size[1])
-        return images
+        crops = np.zeros((len(images), self.crop_size[0], self.crop_size[1], 3))
+        for index in range(len(images)):
+            dw = images[index].shape[1] - self.crop_size[1]
+            dh = images[index].shape[0] - self.crop_size[0]
+            if min(dw, dh) < 0:
+                raise ValueError('Bad crop size: should be not greater than ({}, {})'
+                                 .format(images[index].shape[0], images[index].shape[1]))
+            if dw and dh:
+                x = dw // 2 if self.center else np.random.randint(dw)
+                y = dh // 2 if self.center else np.random.randint(dh)
+                crops[index] = self.crop(images[index], x, y)
+            else:
+                crops[index] = images[index]
+        return crops
 
     def random_flip(self, images, p=0.5):
         images = [img if random.random() > p else cv2.flip(img, 0)
@@ -101,7 +142,7 @@ class Augmentation:
         hsv_img[:, :, 0] *= hue
         hsv_img[:, :, 1] *= saturation
         hsv_img[:, :, 2] *= value
-        hsv_img = hsv_img.astype(dtype=np.uint8)
+        hsv_img = np.clip(hsv_img, 0, 255).astype(dtype=np.uint8)
         return cv2.cvtColor(hsv_img, cv2.COLOR_HSV2RGB)
 
     def random_color_jitter(self, images, p=0.5):
@@ -143,11 +184,9 @@ class Augmentation:
         y = mixing_coeff * labels[0] + (1 - mixing_coeff) * labels[1]
         sigma1 = inputs[0].std()
         sigma2 = inputs[1].std()
-        p = 1 / (1 + sigma1 / sigma2 * (1 - mixing_coeff) / mixing_coeff)
-        img = p * (inputs[0] - inputs[0].mean()) \
-            + (1 - p) * (inputs[1] - inputs[1].mean())
-        img /= (p**2 + (1 - p)**2)
-        return (img, y)
+        p = 1 / (1 + (sigma1 / sigma2) * ((1 - mixing_coeff) / mixing_coeff))
+        img = (p * inputs[0] + (1 - p) * inputs[1]) / np.sqrt(p ** 2 + (1 - p) ** 2)
+        return img, y
 
     def _concat(self, inputs, labels, mixing_coeff, axis=0):
         '''Horizontal and vertical mixed concats.
