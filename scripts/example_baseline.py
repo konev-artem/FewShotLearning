@@ -9,21 +9,23 @@ parser = argparse.ArgumentParser(description='Baseline Few Shot Experiment')
 
 parser.add_argument('--dataset_dir', type=str, required=True,
                     help="Path to dataset")
+parser.add_argument('--csv_name', type=str, required=True,
+                    help="Name of dataset csv metadata file")
 parser.add_argument('--img_width', type=int, default=84,
                     help="Image width")
 parser.add_argument('--img_height', type=int, default=84,
                     help="Image height")
 parser.add_argument('--seed', type=int, default=42,
                     help="Random seed")
+parser.add_argument('--base_num_classes', type=int, default=64,
+                    help="Number of classes for backbone training")
+parser.add_argument('--novel_num_classes', type=int, default=20,
+                    help="Number of novel classes for fewshot")
 
 parser.add_argument('--backbone_type', type=str, default=BaselineExperiment.BackboneType.CONVNET,
                     help="Type of backbone network",
                     choices=BaselineExperiment.get_availible_backbone_types())
-parser.add_argument('--backbone_num_classes', type=int, default=5,
-                    help="Number of classes to train backbone network")
-parser.add_argument('--backbone_train_size', type=float, default=0.5,
-                    help="Train size of backbone dataset")
-parser.add_argument('--backbone_batch_size', type=int, default=64,
+parser.add_argument('--backbone_batch_size', type=int, default=32,
                     help="Backbone training batch size")
 parser.add_argument('--backbone_num_epoch', type=int, default=1,
                     help="Backbone training epochs")
@@ -59,14 +61,15 @@ config = {
 
     "dataset": {
         "dataset_dir": args.dataset_dir,
+        "csv_name": args.csv_name,
         "img_width": args.img_width,
         "img_height": args.img_height,
+        "base_num_classes": args.base_num_classes,
+        "novel_num_classes": args.novel_num_classes,
     },
 
     "backbone": {
         "type": args.backbone_type,
-        "num_classes": args.backbone_num_classes,
-        "train_size": args.backbone_train_size,
         "batch_size": args.backbone_batch_size,
         "num_epoch": args.backbone_num_epoch,
     },

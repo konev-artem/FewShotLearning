@@ -27,25 +27,25 @@ class BaselineExperiment(Experiment):
     def __init__(self, config):
         self.config = config
 
-        # prepare datasets
-        self.dataset = Dataset(config["dataset"]["dataset_dir"])
+        img_width = config["dataset"]["img_width"]
+        img_height = config["dataset"]["img_height"]
 
-        self.backbone_dataset, self.fewshot_dataset = self.dataset.split_by_classes(
-            train_size=config["backbone"]["num_classes"],
+        # prepare datasets
+        self.dataset = Dataset(config["dataset"]["dataset_dir"],
+                               csv_name=config["dataset"]["csv_name"])
+
+        self.backbone_dataset, self.val_fewshot_dataset = self.dataset.split_by_classes(
+            train_size=config["dataset"]["base_num_classes"],
             random_state=config["seed"]
         )
 
-        self.backbone_train_dataset, self.backbone_val_dataset = (
-            self.backbone_dataset.split_by_objects(
-                train_size=config["backbone"]["train_size"],
-                random_state=config["seed"])
+        self.fewshot_dataset, _ = (self.val_fewshot_dataset.split_by_classes(
+            train_size=config["dataset"]["novel_num_classes"],
+            random_state=config["seed"])
         )
 
         # prepare backbone
-        img_width = config["dataset"]["img_width"]
-        img_height = config["dataset"]["img_height"]
         input_size = (img_width, img_height, 3)
-
         if config["backbone"]["type"] == self.BackboneType.CONVNET:
             self.backbone = ConvNet(input_size=input_size)
         elif config["backbone"]["type"] == self.BackboneType.RESNET12:
@@ -54,7 +54,7 @@ class BaselineExperiment(Experiment):
             raise ValueError("Not supported backbone type")
 
         self.backbone_classifier = build_one_layer_classifier(self.backbone,
-                                                              self.backbone_train_dataset.n_classes)
+                                                              self.backbone_dataset.n_classes)
 
     @classmethod
     def get_availible_backbone_types(cls):
@@ -70,17 +70,10 @@ class BaselineExperiment(Experiment):
     def train_backbone(self):
         cross_entropy_train(
             self.backbone_classifier,
-            self.backbone_train_dataset.get_batch_generator(
+            self.backbone_dataset.get_batch_generator(
                 batch_size=self.config["backbone"]["batch_size"],
-                target_size=(self.config["dataset"]["img_width"],
-                             self.config["dataset"]["img_height"]),  # FIXME: redundant
                 shuffle=True
             ),
-            validation_dataset=self.backbone_val_dataset.get_batch_generator(
-                batch_size=self.config["backbone"]["batch_size"],
-                target_size=(self.config["dataset"]["img_width"],
-                             self.config["dataset"]["img_height"]),  # FIXME: redundant
-                shuffle=False),
             n_epochs=self.config["backbone"]["num_epoch"]
         )
 
@@ -107,16 +100,12 @@ class BaselineExperiment(Experiment):
 
             fewshot_model.fit(episode_support.get_batch_generator(
                 batch_size=self.config["fewshot"]["batch_size"],
-                target_size=(self.config["dataset"]["img_width"],
-                             self.config["dataset"]["img_height"]),  # FIXME: redundant
                 shuffle=True),
                 n_epochs=self.config["fewshot"]["batches_per_episode"]
             )
 
             out = fewshot_model.predict(episode_query.get_batch_generator(
                 batch_size=self.config["fewshot"]["batch_size"],
-                target_size=(self.config["dataset"]["img_width"],
-                             self.config["dataset"]["img_height"]),  # FIXME: redundant
                 shuffle=False,
             ))
 
