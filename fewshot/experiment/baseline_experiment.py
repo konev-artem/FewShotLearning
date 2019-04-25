@@ -4,8 +4,7 @@ from ..data_provider import Dataset
 
 from ..algorithms.fewshot_models import BaselineFewShotModel
 from ..algorithms.backbone_pretrain import (
-    build_one_layer_classifier,
-    cross_entropy_train
+    simple_one_layer_cross_entropy_train
 )
 
 import numpy as np
@@ -53,9 +52,6 @@ class BaselineExperiment(Experiment):
         else:
             raise ValueError("Not supported backbone type")
 
-        self.backbone_classifier = build_one_layer_classifier(self.backbone,
-                                                              self.backbone_dataset.n_classes)
-
     @classmethod
     def get_availible_backbone_types(cls):
         return [backbone_type.value for backbone_type in cls.BackboneType]
@@ -68,8 +64,8 @@ class BaselineExperiment(Experiment):
         ...
 
     def train_backbone(self):
-        cross_entropy_train(
-            self.backbone_classifier,
+        simple_one_layer_cross_entropy_train(
+            self.backbone,
             self.backbone_dataset.get_batch_generator(
                 batch_size=self.config["backbone"]["batch_size"],
                 shuffle=True
