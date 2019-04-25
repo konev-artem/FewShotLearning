@@ -13,11 +13,18 @@ class BaselineFewShotModel(FewShotModelBase):
         output = self.head_layer(backbone.get_outputs()[0])
         self.model = tf.keras.models.Model(self.backbone.get_inputs(), output)
 
-    def fit(self, episode_generator, n_epochs=10, optimizer="adam"):
+    def fit(self, x, y, batch_size, epochs, optimizer, **kwargs):
+        self.reset(optimizer)
+        self.model.fit(x, y, batch_size, epochs, **kwargs)
+
+    def fit_generator(self, episode_generator, n_epochs=10, optimizer="adam"):
         self.reset(optimizer)
         self.model.fit_generator(episode_generator, epochs=n_epochs, workers=0, verbose=0)
 
-    def predict(self, episode_dataset):
+    def predict(self, x, batch_size, **kwargs):
+        return self.model.predict(x, batch_size, **kwargs)
+
+    def predict_generator(self, episode_dataset):
         return self.model.predict_generator(episode_dataset, workers=0) # really?
 
     def reset(self, optimizer):
@@ -26,4 +33,4 @@ class BaselineFewShotModel(FewShotModelBase):
             optimizer,
             lambda y_true, y_pred: tf.keras.losses.categorical_crossentropy(y_true, y_pred, from_logits=True),
             metrics=["accuracy"]
-        ) # probably we need to completely destroy to prevent memory leaks
+        )  # probably we need to completely destroy to prevent memory leaks
