@@ -81,8 +81,7 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
 
         self.classes = sorted(self.y.unique())
         self.n_classes = len(self.classes)
-        self.encoding = {class_name: to_categorical(class_index, num_classes=self.n_classes) \
-                         for class_index, class_name in enumerate(self.classes)}
+        self._create_encoding(self.classes)
 
         self.num_samples = len(dataframe)
         self.directory = directory
@@ -102,6 +101,10 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
             batch_size,
             shuffle,
             seed)
+
+    def _create_encoding(self, classes):
+        self.encoding = {class_name: to_categorical(class_index, num_classes=len(classes)) \
+                         for class_index, class_name in enumerate(classes)}
 
     def get_encoding(self):
         return self.encoding
@@ -132,19 +135,19 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
 
         return img.copy()
 
-    def _transform_samples(self, x, y, image_data_generator=None):
-        transformed_x, transformed_y = image_data_generator.apply_random_transform(x, y)
+    def _transform_samples(self, x, y):
+        transformed_x, transformed_y = self.image_data_generator.apply_random_transform(x, y)
         return transformed_x, transformed_y
 
-    def _get_batches_of_transformed_samples(self, index_arrays, image_data_generator):
+    def _get_batches_of_transformed_samples(self, index_arrays):
         batch_size = len(index_arrays[0])
         batch_x = np.zeros((batch_size, self.target_size[0], self.target_size[1], 3), dtype=self.dtype)
-        batch_y = np.zeros((batch_size, self.n_classes))
+        batch_y = np.zeros((batch_size, len(self.encoding)))
         for index_in_batch, index_group in enumerate(zip(*index_arrays)):
             index_group = list(index_group)
             image_group = [self._get_image(filename) for filename in self.x.iloc[index_group]]
             label_group = self.y.iloc[index_group].map(self.encoding).values
-            image_arr, label = self._transform_samples(image_group, label_group, image_data_generator)
+            image_arr, label = self._transform_samples(image_group, label_group)
             batch_x[index_in_batch] = image_arr
             batch_y[index_in_batch] = label
 
@@ -168,29 +171,32 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
             index_arrays = [next(self.index_generator) for _ in range(self.num_images_in_augmentation)]
         # The transformation of images is not under thread lock
         # so it can be done in parallel
-        return self._get_batches_of_transformed_samples(index_arrays, self.image_data_generator)
+        return self._get_batches_of_transformed_samples(index_arrays)
 
 
 class FewShotDataFrameIterator(DataFrameIterator):
     def __init__(self,
                  dataframe,
                  directory,
-                 image_data_generator,
+                 support_image_data_generator,
                  query_image_data_generator,
                  class_index,
+                 n_way,
                  k_shot,
                  query_samples_per_class=None,
                  *args, **kwargs):
         super(FewShotDataFrameIterator, self).__init__(dataframe,
                                                        directory,
-                                                       image_data_generator=image_data_generator,
+                                                       image_data_generator=support_image_data_generator,
                                                        *args, **kwargs)
+        self.support_image_data_generator = support_image_data_generator
         self.query_image_data_generator = query_image_data_generator
+        self.n_way = n_way
         self.support_samples_per_class = k_shot
         self.query_samples_per_class = query_samples_per_class \
             if query_samples_per_class is not None else np.inf
         self.class_index = class_index
-        self.num_images_in_support_augmentation = image_data_generator.get_num_images_in_augmentation()
+        self.num_images_in_support_augmentation = support_image_data_generator.get_num_images_in_augmentation()
         self.num_images_in_query_augmentation = query_image_data_generator.get_num_images_in_augmentation()
 
     def _adjust(self, index, size, num_images_in_augmentation):
@@ -208,9 +214,12 @@ class FewShotDataFrameIterator(DataFrameIterator):
             The next batch.
         """
         with self.lock:
+            classes = np.random.choice(self.classes, self.n_way, replace=False)
+            self._create_encoding(classes)
             support_index_arrays = None
             query_index_arrays = None
-            for class_index in self.class_index.values():
+            for class_name in classes:
+                class_index = self.class_index[class_name]
                 desired_support_samples = (self.support_samples_per_class
                                            * self.num_images_in_support_augmentation)
 
@@ -240,6 +249,8 @@ class FewShotDataFrameIterator(DataFrameIterator):
 
             # The transformation of images is not under thread lock
             # so it can be done in parallel
-            support = self._get_batches_of_transformed_samples(support_index_arrays, self.image_data_generator)
-            query = self._get_batches_of_transformed_samples(query_index_arrays, self.query_image_data_generator)
+            self.image_data_generator = self.support_image_data_generator
+            support = self._get_batches_of_transformed_samples(support_index_arrays)
+            self.image_data_generator = self.query_image_data_generator
+            query = self._get_batches_of_transformed_samples(query_index_arrays)
         return support, query
