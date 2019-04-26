@@ -24,12 +24,12 @@ class ConvBlock(tf.keras.layers.Layer):
             self.nl = create_activation(activation)
         else:
             self.nl = None
-        
+
         if add_maxpool:
             self.maxpool = tf.keras.layers.MaxPool2D()
         else:
             self.maxpool = None
-        
+
         self.out_channels = out_channels
         super(ConvBlock, self).__init__(**kwargs)
 
@@ -39,10 +39,10 @@ class ConvBlock(tf.keras.layers.Layer):
 
         if self.nl is not None:
             out = self.nl(out)
-        
+
         if self.maxpool is not None:
             out = self.maxpool(out)
-        
+
         return out
 
     def set_trainable(self, trainable):
@@ -78,7 +78,7 @@ class ConvNet:
         x = input
         for block in self.blocks:
             x = block(x)
-            
+
         return [input], [x]
 
     def set_trainable(self, trainable):

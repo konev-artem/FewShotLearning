@@ -15,7 +15,7 @@ class ResidualBlock(layers.Layer):
 
         self.conv_res = layers.Conv2D(out_channels, 3, padding='same')
         self.bn_res = layers.BatchNormalization()
-                
+
         self.out_channels = out_channels
         super(ResidualBlock, self).__init__(**kwargs)
 
@@ -26,11 +26,11 @@ class ResidualBlock(layers.Layer):
 
         z = self.conv_res(x)
         z = self.bn_res(z)
-        
+
         out = y + z
         out = self.nl(out)
         out = self.maxpool(out)
-        
+
         return out
 
     def set_trainable(self, trainable):
@@ -39,11 +39,11 @@ class ResidualBlock(layers.Layer):
         self.conv3.set_trainable(trainable)
 
         self.conv_res.trainable = trainable
-        self.bn_res.trainable = trainable       
-        
+        self.bn_res.trainable = trainable
+
     def compute_output_shape(self, input_shape):
         return self.conv_res.compute_output_shape(input_shape)
-    
+
 
 class Resnet12:
     def __init__(self, input_size, activation='swish1'):
@@ -52,7 +52,7 @@ class Resnet12:
         self.residual3 = ResidualBlock(256, activation)
         self.residual4 = ResidualBlock(512, activation)
         self.inputs, self.outputs = self._build_net(input_size)
-        
+
     def _build_net(self, input_size):
         input = layers.Input(shape=input_size)
         x = self.residual1(input)
