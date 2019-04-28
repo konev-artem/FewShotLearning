@@ -136,11 +136,11 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
 
         return img.copy()
 
-    def _transform_samples(self, x, y):
-        transformed_x, transformed_y = self.image_data_generator.apply_random_transform(x, y)
+    def _transform_samples(self, x, y, image_data_generator):
+        transformed_x, transformed_y = image_data_generator.apply_random_transform(x, y)
         return transformed_x, transformed_y
 
-    def _get_batches_of_transformed_samples(self, index_groups):
+    def _get_batches_of_transformed_samples(self, index_groups, image_data_generator):
         parallel = isinstance(index_groups[0], numbers.Number)
         if parallel:
             index_groups = [index_groups]
@@ -152,7 +152,7 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
             index_group = list(index_group)
             image_group = [self._get_image(filename) for filename in self.x.iloc[index_group]]
             label_group = self.y.iloc[index_group].map(self.encoding).values
-            image_arr, label = self._transform_samples(image_group, label_group)
+            image_arr, label = self._transform_samples(image_group, label_group, image_data_generator)
             batch_x[index_in_batch] = image_arr
             batch_y[index_in_batch] = label
 
@@ -179,7 +179,7 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
         index_array = self.index_array[self.batch_size * idx:
                                        self.batch_size * (idx + self.num_images_in_augmentation)]
         index_array = index_array.reshape((-1, self.num_images_in_augmentation))
-        return self._get_batches_of_transformed_samples(index_array)
+        return self._get_batches_of_transformed_samples(index_array, self.image_data_generator)
 
     def next(self):
         """For python 2.x.
@@ -187,11 +187,12 @@ class DataFrameIterator(BatchFromFilesMixin, Iterator):
             The next batch.
         """
         with self.lock:
-            index_arrays = [next(self.index_generator) for _ in range(self.num_images_in_augmentation)]
+            index_arrays = [next(self.index_generator) \
+                            for _ in range(self.num_images_in_augmentation)]
             index_groups = list(zip(*index_arrays))
         # The transformation of images is not under thread lock
         # so it can be done in parallel
-        return self._get_batches_of_transformed_samples(index_groups)
+        return self._get_batches_of_transformed_samples(index_groups, self.image_data_generator)
 
 
 class FewShotDataFrameIterator(DataFrameIterator):
@@ -269,10 +270,10 @@ class FewShotDataFrameIterator(DataFrameIterator):
 
         support_index_array, query_index_array = self._sample_index_array()
 
-        self.image_data_generator = self.support_image_data_generator
-        support = self._get_batches_of_transformed_samples(support_index_array)
-        self.image_data_generator = self.query_image_data_generator
-        query = self._get_batches_of_transformed_samples(query_index_array)
+        support = self._get_batches_of_transformed_samples(support_index_array,
+                                                           self.support_image_data_generator)
+        query = self._get_batches_of_transformed_samples(query_index_array,
+                                                         self.query_image_data_generator)
         return support, query
 
     def next(self):
@@ -285,8 +286,8 @@ class FewShotDataFrameIterator(DataFrameIterator):
 
         # The transformation of images is not under thread lock
         # so it can be done in parallel
-        self.image_data_generator = self.support_image_data_generator
-        support = self._get_batches_of_transformed_samples(support_index_array)
-        self.image_data_generator = self.query_image_data_generator
-        query = self._get_batches_of_transformed_samples(query_index_array)
+        support = self._get_batches_of_transformed_samples(support_index_array,
+                                                           self.support_image_data_generator)
+        query = self._get_batches_of_transformed_samples(query_index_array,
+                                                         self.query_image_data_generator)
         return support, query
