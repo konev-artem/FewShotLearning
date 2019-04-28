@@ -4,7 +4,8 @@ from fewshot.utils import join_models
 
 
 def _train(backbone, head, loss, optimizer, n_epochs,
-           train_generator, validation_generator, checkpoint, callbacks):
+           train_generator, validation_generator, checkpoint, callbacks,
+           **kwargs):
     model = join_models(backbone, head)
     model.compile(optimizer, loss, metrics=["accuracy"])
     if checkpoint:
@@ -14,9 +15,8 @@ def _train(backbone, head, loss, optimizer, n_epochs,
         train_generator,
         epochs=n_epochs,
         validation_data=validation_generator,
-        use_multiprocessing=False,
-        workers=0,  # TODO: Override __getitem__ method in fewshot.data_provider.generator.DataFrameIterator
-        callbacks=callbacks
+        callbacks=callbacks,
+        **kwargs
     )
 
     return backbone
@@ -24,7 +24,7 @@ def _train(backbone, head, loss, optimizer, n_epochs,
 
 def simple_one_layer_cross_entropy_train(backbone, train_dataset, validation_dataset=None,
                                          n_epochs=1, optimizer="adam", checkpoint=None,
-                                         callbacks=[]):
+                                         callbacks=[], **kwargs):
     return _train(
         backbone=backbone,
         head=tf.keras.Sequential([
@@ -38,5 +38,6 @@ def simple_one_layer_cross_entropy_train(backbone, train_dataset, validation_dat
         train_generator=train_dataset,
         validation_generator=validation_dataset,
         checkpoint=checkpoint,
-        callbacks=callbacks
+        callbacks=callbacks,
+        **kwargs
     )
