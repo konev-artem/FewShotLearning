@@ -8,6 +8,5 @@ def join_models(base_model, head_layer_to_apply):
 
 def reset_weights(model):
     session = tf.keras.backend.get_session()
-    print(session)
     for weight in model.trainable_weights:
         weight.initializer.run(session=session)
