@@ -17,6 +17,7 @@ class Augmentation:
                  hue_range=(1, 1),
                  saturation_range=(1, 1),
                  value_range=(1, 1),
+                 contrast_range=(0, 0),
                  mixup_prob=0,
                  noisy_mixup_prob=0,
                  between_class_prob=0,
@@ -35,6 +36,7 @@ class Augmentation:
         self.interpolation = interpolation
         self.color_jitter_prob = color_jitter_prob
         self.hsv_ranges = (hue_range, saturation_range, value_range)
+        self.contrast = contrast_range
         self.mixup_prob = mixup_prob
         self.noisy_mixup_prob = noisy_mixup_prob
         self.between_class_prob = between_class_prob
@@ -184,7 +186,18 @@ class Augmentation:
                   for img in images]
         return images
 
-    def color_jitter(self, img, hsv_factors):
+    def contrast_jitter(self, img, contrast_factor):
+        img = img.astype(dtype=np.float32)
+        coeff = np.array([[[0.299, 0.587, 0.114]]])
+        contrast_factor += 1.0
+        gray = img * coeff
+        gray = (3.0 * (1.0 - contrast_factor) / gray.size) * np.sum(gray)
+        img *= contrast_factor
+        img += gray
+        img = np.clip(img, 0, 255).astype(dtype=np.uint8)
+        return img
+
+    def hsv_jitter(self, img, hsv_factors):
         hue, saturation, value = hsv_factors
         hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
         hsv_img = hsv_img.astype(dtype=np.float32)
@@ -203,7 +216,10 @@ class Augmentation:
             saturation_factor = np.random.uniform(saturation[0], saturation[1])
             value_factor = np.random.uniform(value[0], value[1])
             hsv_factors = (hue_factor, saturation_factor, value_factor)
-            images[index] = self.color_jitter(images[index], hsv_factors)
+            contrast_factor = np.random.uniform(self.contrast[0], self.contrast[1])
+            contrast_factor = np.random.uniform(-contrast_factor, contrast_factor)
+            images[index] = self.hsv_jitter(images[index], hsv_factors)
+            images[index] = self.contrast_jitter(images[index], contrast_factor)
         return images
 
     def mixup(self, inputs, labels, mixing_coeff):
