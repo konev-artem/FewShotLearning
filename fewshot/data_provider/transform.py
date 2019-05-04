@@ -10,6 +10,9 @@ class Augmentation:
                  flip_prob=0,
                  center=None,
                  crop_size=None,
+                 crop_scale=None,
+                 crop_ratio=None,
+                 interpolation=1,  # bilinear
                  color_jitter_prob=0,
                  hue_range=(1, 1),
                  saturation_range=(1, 1),
@@ -27,6 +30,9 @@ class Augmentation:
         self.flip_prob = flip_prob
         self.center = center
         self.crop_size = crop_size
+        self.crop_scale = crop_scale
+        self.crop_ratio = crop_ratio
+        self.interpolation = interpolation
         self.color_jitter_prob = color_jitter_prob
         self.hsv_ranges = (hue_range, saturation_range, value_range)
         self.mixup_prob = mixup_prob
@@ -71,7 +77,10 @@ class Augmentation:
         if self.mode == 'test':
             self.center = True
 
-        self.make_crop = self.crop_size is not None
+        # make_resized_crop and make_crop can't be applied simultaneously
+        self.make_resized_crop = self.crop_size is not None and \
+            self.crop_scale is not None and self.crop_ratio is not None
+        self.make_crop = not self.make_resized_crop and self.crop_size is not None
         if isinstance(self.crop_size, numbers.Number):
             self.crop_size = (int(self.crop_size), int(self.crop_size))
 
@@ -97,6 +106,7 @@ class Augmentation:
         assert all([images[index].dtype == np.uint8 for index in range(len(images))])
         # crop
         images = self.random_crop(images)
+        images = self.random_resized_crop(images)
         # basic stage
         images = self.apply_random_basic_transform(images)
         # mixup stage
@@ -104,12 +114,13 @@ class Augmentation:
             labels = np.stack(labels).astype(np.float32)
             img, label = self.apply_random_mixed_transform(images, labels, self.mixing_coeff)
         else:
-            img, label = images[0], labels[0]
+            img = images[0]
+            label = None if labels is None else labels[0]
         img = np.array(np.clip(img, 0, 255), dtype='uint8')
         return img, label
 
     def crop(self, img, x, y):
-        return img[y:y + self.crop_size[0], x:x + self.crop_size[1]]
+        return img[y: y + self.crop_size[0], x: x + self.crop_size[1]]
 
     def random_crop(self, images):
         if not self.make_crop:
@@ -129,6 +140,44 @@ class Augmentation:
             else:
                 crops[index] = images[index]
         return crops
+
+    def _obtain_resized_crop_params_(self, img):
+        '''By analogy with RandomResizedCrop from torchvision/transforms/transform.py'''
+        area = img.shape[0] * img.shape[1]
+        for i in range(10):
+            res_area = area * np.random.uniform(*self.crop_scale)
+            log_ratio = (np.log(self.crop_ratio[0]), np.log(self.crop_ratio[1]))
+            aspect_ratio = np.exp(np.random.uniform(*log_ratio))
+            w = int(np.round(np.sqrt(res_area * aspect_ratio)))
+            h = int(np.round(np.sqrt(res_area / aspect_ratio)))
+            if w <= img.shape[0] and h <= img.shape[1]:
+                i = random.randint(0, img.shape[1] - h)
+                j = random.randint(0, img.shape[0] - w)
+                return i, j, h, w
+
+        in_ratio = img.shape[0] / img.shape[1]
+        if (in_ratio < min(self.crop_ratio)):
+            w = img.shape[0]
+            h = w / min(self.crop_ratio)
+        elif (in_ratio > max(self.crop_ratio)):
+            h = img.shape[1]
+            w = h * max(self.crop_ratio)
+        else:  # whole image
+            w = img.shape[0]
+            h = img.shape[1]
+        i = (img.shape[1] - h) // 2
+        j = (img.shape[0] - w) // 2
+        return i, j, h, w
+
+    def random_resized_crop(self, images):
+        if not self.make_resized_crop:
+            return images
+        for index in range(len(images)):
+            i, j, w, h = self._obtain_resized_crop_params_(images[index])
+            images[index] = images[index][j:j + h, i:i + w]
+            images[index] = cv2.resize(images[index], self.crop_size,
+                                       interpolation=self.interpolation)
+        return images
 
     def random_flip(self, images, p=0.5):
         images = [img if random.random() > p else cv2.flip(img, 0)
