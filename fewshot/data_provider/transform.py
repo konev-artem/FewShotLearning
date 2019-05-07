@@ -160,10 +160,10 @@ class Augmentation:
         in_ratio = img.shape[0] / img.shape[1]
         if (in_ratio < min(self.crop_ratio)):
             w = img.shape[0]
-            h = w / min(self.crop_ratio)
+            h = w // min(self.crop_ratio)
         elif (in_ratio > max(self.crop_ratio)):
             h = img.shape[1]
-            w = h * max(self.crop_ratio)
+            w = int(h * max(self.crop_ratio))
         else:  # whole image
             w = img.shape[0]
             h = img.shape[1]
@@ -187,6 +187,7 @@ class Augmentation:
         return images
 
     def contrast_jitter(self, img, contrast_factor):
+        '''By analogy with ContrastJitterAug from mxnet.image.image'''
         img = img.astype(dtype=np.float32)
         coeff = np.array([[[0.299, 0.587, 0.114]]])
         contrast_factor += 1.0
