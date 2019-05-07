@@ -10,10 +10,14 @@ class Augmentation:
                  flip_prob=0,
                  center=None,
                  crop_size=None,
+                 crop_scale=None,
+                 crop_ratio=None,
+                 interpolation=1,  # bilinear
                  color_jitter_prob=0,
                  hue_range=(1, 1),
                  saturation_range=(1, 1),
                  value_range=(1, 1),
+                 contrast_range=(0, 0),
                  mixup_prob=0,
                  noisy_mixup_prob=0,
                  between_class_prob=0,
@@ -27,8 +31,12 @@ class Augmentation:
         self.flip_prob = flip_prob
         self.center = center
         self.crop_size = crop_size
+        self.crop_scale = crop_scale
+        self.crop_ratio = crop_ratio
+        self.interpolation = interpolation
         self.color_jitter_prob = color_jitter_prob
         self.hsv_ranges = (hue_range, saturation_range, value_range)
+        self.contrast = contrast_range
         self.mixup_prob = mixup_prob
         self.noisy_mixup_prob = noisy_mixup_prob
         self.between_class_prob = between_class_prob
@@ -71,7 +79,10 @@ class Augmentation:
         if self.mode == 'test':
             self.center = True
 
-        self.make_crop = self.crop_size is not None
+        # make_resized_crop and make_crop can't be applied simultaneously
+        self.make_resized_crop = self.crop_size is not None and \
+            self.crop_scale is not None and self.crop_ratio is not None
+        self.make_crop = not self.make_resized_crop and self.crop_size is not None
         if isinstance(self.crop_size, numbers.Number):
             self.crop_size = (int(self.crop_size), int(self.crop_size))
 
@@ -97,6 +108,7 @@ class Augmentation:
         assert all([images[index].dtype == np.uint8 for index in range(len(images))])
         # crop
         images = self.random_crop(images)
+        images = self.random_resized_crop(images)
         # basic stage
         images = self.apply_random_basic_transform(images)
         # mixup stage
@@ -104,12 +116,13 @@ class Augmentation:
             labels = np.stack(labels).astype(np.float32)
             img, label = self.apply_random_mixed_transform(images, labels, self.mixing_coeff)
         else:
-            img, label = images[0], labels[0]
+            img = images[0]
+            label = None if labels is None else labels[0]
         img = np.array(np.clip(img, 0, 255), dtype='uint8')
         return img, label
 
     def crop(self, img, x, y):
-        return img[y:y + self.crop_size[0], x:x + self.crop_size[1]]
+        return img[y: y + self.crop_size[0], x: x + self.crop_size[1]]
 
     def random_crop(self, images):
         if not self.make_crop:
@@ -130,12 +143,62 @@ class Augmentation:
                 crops[index] = images[index]
         return crops
 
+    def _obtain_resized_crop_params_(self, img):
+        '''By analogy with RandomResizedCrop from torchvision/transforms/transform.py'''
+        area = img.shape[0] * img.shape[1]
+        for i in range(10):
+            res_area = area * np.random.uniform(*self.crop_scale)
+            log_ratio = (np.log(self.crop_ratio[0]), np.log(self.crop_ratio[1]))
+            aspect_ratio = np.exp(np.random.uniform(*log_ratio))
+            w = int(np.round(np.sqrt(res_area * aspect_ratio)))
+            h = int(np.round(np.sqrt(res_area / aspect_ratio)))
+            if w <= img.shape[0] and h <= img.shape[1]:
+                i = random.randint(0, img.shape[1] - h)
+                j = random.randint(0, img.shape[0] - w)
+                return i, j, h, w
+
+        in_ratio = img.shape[0] / img.shape[1]
+        if (in_ratio < min(self.crop_ratio)):
+            w = img.shape[0]
+            h = w // min(self.crop_ratio)
+        elif (in_ratio > max(self.crop_ratio)):
+            h = img.shape[1]
+            w = int(h * max(self.crop_ratio))
+        else:  # whole image
+            w = img.shape[0]
+            h = img.shape[1]
+        i = (img.shape[1] - h) // 2
+        j = (img.shape[0] - w) // 2
+        return i, j, h, w
+
+    def random_resized_crop(self, images):
+        if not self.make_resized_crop:
+            return images
+        for index in range(len(images)):
+            i, j, w, h = self._obtain_resized_crop_params_(images[index])
+            images[index] = images[index][j:j + h, i:i + w]
+            images[index] = cv2.resize(images[index], self.crop_size,
+                                       interpolation=self.interpolation)
+        return images
+
     def random_flip(self, images, p=0.5):
         images = [img if random.random() > p else cv2.flip(img, 0)
                   for img in images]
         return images
 
-    def color_jitter(self, img, hsv_factors):
+    def contrast_jitter(self, img, contrast_factor):
+        '''By analogy with ContrastJitterAug from mxnet.image.image'''
+        img = img.astype(dtype=np.float32)
+        coeff = np.array([[[0.299, 0.587, 0.114]]])
+        contrast_factor += 1.0
+        gray = img * coeff
+        gray = (3.0 * (1.0 - contrast_factor) / gray.size) * np.sum(gray)
+        img *= contrast_factor
+        img += gray
+        img = np.clip(img, 0, 255).astype(dtype=np.uint8)
+        return img
+
+    def hsv_jitter(self, img, hsv_factors):
         hue, saturation, value = hsv_factors
         hsv_img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
         hsv_img = hsv_img.astype(dtype=np.float32)
@@ -154,7 +217,10 @@ class Augmentation:
             saturation_factor = np.random.uniform(saturation[0], saturation[1])
             value_factor = np.random.uniform(value[0], value[1])
             hsv_factors = (hue_factor, saturation_factor, value_factor)
-            images[index] = self.color_jitter(images[index], hsv_factors)
+            contrast_factor = np.random.uniform(self.contrast[0], self.contrast[1])
+            contrast_factor = np.random.uniform(-contrast_factor, contrast_factor)
+            images[index] = self.hsv_jitter(images[index], hsv_factors)
+            images[index] = self.contrast_jitter(images[index], contrast_factor)
         return images
 
     def mixup(self, inputs, labels, mixing_coeff):
