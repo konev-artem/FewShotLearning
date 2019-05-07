@@ -3,7 +3,8 @@ import datetime
 
 import tensorflow as tf
 
-from fewshot.utils import join_models
+from ..special_layers import CosineLayer
+from ...utils import join_models
 
 
 def _train(backbone,
@@ -73,6 +74,24 @@ def simple_one_layer_cross_entropy_train(backbone,
         head=tf.keras.Sequential([
             tf.keras.layers.Flatten(),
             tf.keras.layers.Dense(train_dataset.n_classes),
+        ]),
+        loss=lambda y_true, y_pred: tf.keras.losses.categorical_crossentropy(
+            y_true, y_pred, from_logits=True),
+        train_generator=train_dataset,
+        validation_generator=validation_dataset,
+        **kwargs
+    )
+
+
+def simple_cosine_layer_cross_entropy_train(backbone,
+                                         train_dataset,
+                                         validation_dataset=None,
+                                         **kwargs):
+    return _train(
+        backbone=backbone,
+        head=tf.keras.Sequential([
+            tf.keras.layers.Flatten(),
+            CosineLayer(train_dataset.n_classes),
         ]),
         loss=lambda y_true, y_pred: tf.keras.losses.categorical_crossentropy(
             y_true, y_pred, from_logits=True),
