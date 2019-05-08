@@ -7,6 +7,7 @@ import random
 class Augmentation:
     def __init__(self,
                  mode='train',
+                 size=None,
                  flip_prob=0,
                  center=None,
                  crop_size=None,
@@ -28,6 +29,7 @@ class Augmentation:
                  num_images_in_mixup=1,
                  mixing_coeff=None):
         self.mode = mode
+        self.size = size
         self.flip_prob = flip_prob
         self.center = center
         self.crop_size = crop_size
@@ -106,6 +108,8 @@ class Augmentation:
 
     def apply_random_transform(self, images, labels=None):
         assert all([images[index].dtype == np.uint8 for index in range(len(images))])
+        # resize
+        images = self.resize(images)
         # crop
         images = self.random_crop(images)
         images = self.random_resized_crop(images)
@@ -169,14 +173,24 @@ class Augmentation:
             h = img.shape[1]
         i = (img.shape[1] - h) // 2
         j = (img.shape[0] - w) // 2
-        return i, j, h, w
+
+        return int(i), int(j), int(h), int(w)
+
+    def resize(self, images):
+        if self.size is None:
+            return images
+
+        for index in range(len(images)):
+            images[index] = cv2.resize(images[index], self.size,
+                                       interpolation=self.interpolation)
+        return images
 
     def random_resized_crop(self, images):
         if not self.make_resized_crop:
             return images
         for index in range(len(images)):
-            i, j, w, h = self._obtain_resized_crop_params_(images[index])
-            images[index] = images[index][j:j + h, i:i + w]
+            i, j, h, w = self._obtain_resized_crop_params_(images[index])
+            images[index] = images[index][j:(j + h), i:(i + w)]
             images[index] = cv2.resize(images[index], self.crop_size,
                                        interpolation=self.interpolation)
         return images
