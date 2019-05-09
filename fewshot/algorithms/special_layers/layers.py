@@ -1,6 +1,17 @@
 import tensorflow as tf
 
 
+def pairwise_cosine(X, Y, transpose_Y=True):
+    if transpose_Y:
+        Y = tf.transpose(Y)
+
+    dot_product = tf.matmul(X, Y)
+    x_norm = tf.pow(tf.reduce_sum(tf.multiply(X, X), axis=1, keepdims=True) + 1e-7, 0.5)
+    y_norm = tf.pow(tf.reduce_sum(tf.multiply(Y, Y), axis=0, keepdims=True) + 1e-7, 0.5)
+
+    return dot_product / x_norm / y_norm
+
+
 class CosineLayer(tf.keras.layers.Layer):
     def __init__(self, num_classes):
         self.num_classes = num_classes
@@ -22,8 +33,4 @@ class CosineLayer(tf.keras.layers.Layer):
         return (input_shape[1].value, self.num_classes)
 
     def call(self, input, **kwargs):
-        dot_product = tf.matmul(input, self.W)
-        f_norm = tf.pow(tf.reduce_sum(tf.multiply(input, input), axis=1, keepdims=True), 0.5)
-        w_norm = tf.pow(tf.reduce_sum(tf.multiply(self.W, self.W), axis=0, keepdims=True), 0.5)
-
-        return dot_product / f_norm / w_norm
+        return pairwise_cosine(input, self.W, transpose_Y=False)

@@ -6,11 +6,17 @@ from fewshot.utils import reset_weights
 
 
 class BaselineFewShotModel(FewShotModelBase):
-    def __init__(self, backbone, num_classes):
+    def __init__(self, backbone, num_classes, with_cosine=True):
+        if with_cosine:
+            logits_layer = CosineLayer(num_classes)
+        else:
+            logits_layer = tf.keras.layers.Dense(num_classes)
+
         self.head_layer = tf.keras.Sequential([
             tf.keras.layers.Flatten(),
-            CosineLayer(num_classes)
+            logits_layer
         ])
+
         self.backbone = backbone
         self.backbone.set_trainable(False)
         output = self.head_layer(backbone.get_outputs()[0])
