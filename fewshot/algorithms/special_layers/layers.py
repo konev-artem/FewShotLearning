@@ -7,7 +7,6 @@ def pairwise_cosine(X, Y, transpose_Y=True):
 
     dot_product = tf.matmul(X, Y)
     x_norm = tf.pow(tf.reduce_sum(tf.multiply(X, X), axis=1, keepdims=True) + 1e-7, 0.5)
-#     y_norm = tf.pow(tf.reduce_sum(tf.multiply(Y, Y), axis=0, keepdims=True) + 1e-7, 0.5)
 
     return dot_product / x_norm
 
