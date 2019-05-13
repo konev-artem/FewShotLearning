@@ -15,8 +15,7 @@ class BaselineFewShotModel(FewShotModelBase):
 
         self.head_layer = tf.keras.Sequential([
             tf.keras.layers.Flatten(),
-            logits_layer,
-            tf.keras.layers.BatchNormalization()
+            logits_layer
         ])
 
         self.backbone = backbone
