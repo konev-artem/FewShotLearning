@@ -86,12 +86,13 @@ def simple_one_layer_cross_entropy_train(backbone,
 def simple_cosine_layer_cross_entropy_train(backbone,
                                          train_dataset,
                                          validation_dataset=None,
+                                         scale_factor=10,
                                          **kwargs):
     return _train(
         backbone=backbone,
         head=tf.keras.Sequential([
             tf.keras.layers.Flatten(),
-            CosineLayer(train_dataset.n_classes),
+            CosineLayer(train_dataset.n_classes, scale_factor),
         ]),
         loss=lambda y_true, y_pred: tf.keras.losses.categorical_crossentropy(
             y_true, y_pred, from_logits=True),
