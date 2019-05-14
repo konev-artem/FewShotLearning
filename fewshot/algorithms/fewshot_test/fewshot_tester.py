@@ -50,3 +50,15 @@ def baseline_fewshot_test(model,
             file_writer.flush()
 
     return accuracies
+
+def bootstrap(accuracy, sz=1000, seed=42, ci_lvl=0.95, verbose=True):
+    np.random.seed(seed)
+    bts = np.random.choice(accuracy, size=(sz, len(accuracy)), replace=True)
+    bts = np.sort(np.mean(bts, 1))
+    quant_left = int((1 - ci_lvl) * sz // 2)
+    left_bound = bts[quant_left]
+    right_bound = bts[-quant_left]
+    if verbose:
+        print('metric: accuracy, mean: {:.2f}, std: {:.2f}, 95% conf interval: [{:.2f} ,{:.2f}]'.format(
+            np.mean(accuracy), np.std(accuracy), left_bound, right_bound))
+    return np.mean(accuracy), np.std(accuracy), left_bound, right_bound

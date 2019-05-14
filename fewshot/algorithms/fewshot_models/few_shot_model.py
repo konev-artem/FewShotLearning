@@ -6,9 +6,10 @@ from fewshot.utils import reset_weights
 
 
 class BaselineFewShotModel(FewShotModelBase):
-    def __init__(self, backbone, num_classes, with_cosine=True):
+    def __init__(self, backbone, num_classes, with_cosine=True, scale_factor=10):
+        self.scale_factor = scale_factor
         if with_cosine:
-            logits_layer = CosineLayer(num_classes)
+            logits_layer = CosineLayer(num_classes, self.scale_factor)
         else:
             logits_layer = tf.keras.layers.Dense(num_classes)
 

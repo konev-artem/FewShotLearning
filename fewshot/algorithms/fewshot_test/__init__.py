@@ -1,4 +1,4 @@
-from .fewshot_tester import baseline_fewshot_test
+from .fewshot_tester import baseline_fewshot_test, bootstrap
 
 
-__all__ = ["baseline_fewshot_test"]
+__all__ = ["baseline_fewshot_test", "bootstrap"]
